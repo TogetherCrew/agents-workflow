@@ -8,7 +8,7 @@ from tasks.hivemind.agent import AgenticHivemindFlow
 
 
 @activity.defn
-def run_hivemind_agent_activity(payload: HivemindQueryPayload) -> HivemindQueryPayload:
+async def run_hivemind_agent_activity(payload: HivemindQueryPayload) -> HivemindQueryPayload:
     """
     Activity that instantiates and runs the Crew.ai Flow (AgenticHivemindFlow).
     It places the resulting answer into payload.content.response.
@@ -22,7 +22,7 @@ def run_hivemind_agent_activity(payload: HivemindQueryPayload) -> HivemindQueryP
     )
 
     # Run the flow
-    crew_output = flow.kickoff(inputs={"query": payload.query})
+    crew_output = await flow.kickoff_async(inputs={"query": payload.query})
 
     # crew_output could be None if skipping or any other logic, so handle gracefully
     if crew_output:

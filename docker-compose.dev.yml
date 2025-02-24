@@ -14,7 +14,7 @@ services:
       redis:
         condition: service_healthy
     networks:
-      - temporal-network
+      - agent-temporal-network
 
   temporal:
     image: temporalio/auto-setup:1.25.2.0
@@ -34,7 +34,7 @@ services:
       - POSTGRES_PWD=temporal
       - POSTGRES_SEEDS=temporal-postgresql
     networks:
-      - temporal-network
+      - agent-temporal-network
     healthcheck:
       test: ["CMD", "tctl", "--address", "temporal:7233", "workflow", "list"]
       interval: 1s
@@ -51,7 +51,7 @@ services:
     ports:
       - 8080:8080
     networks:
-      - temporal-network
+      - agent-temporal-network
 
   temporal-postgresql:
     image: postgres:12.21
@@ -64,7 +64,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - temporal-network
+      - agent-temporal-network
 
   mongo:
     image: "mongo:6.0.8"
@@ -80,7 +80,7 @@ services:
       retries: 3
       start_period: 40s
     networks:
-      - temporal-network
+      - agent-temporal-network
 
   qdrant:
     image: qdrant/qdrant:v1.9.2
@@ -91,7 +91,7 @@ services:
     volumes:
       - ./qdrant_data:/qdrant_data
     networks:
-      - temporal-network
+      - agent-temporal-network
   qdrant-healthcheck:
     restart: always
     image: curlimages/curl:8.11.0
@@ -104,7 +104,7 @@ services:
       timeout: 2s
       retries: 5
     networks:
-      - temporal-network
+      - agent-temporal-network
 
   redis:
     image: redis:7.0.11
@@ -118,9 +118,9 @@ services:
     ports:
       - 6379:6379
     networks:
-      - temporal-network
+      - agent-temporal-network
 
 networks:
-  temporal-network:
+  agent-temporal-network:
     driver: bridge
-    name: temporal-network
+    name: agent-temporal-network
