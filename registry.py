@@ -1,6 +1,5 @@
-from activities import say_hello
-from workflows import SayHello
+from tasks import AgenticHivemindTemporalWorkflow, run_hivemind_agent_activity
 
-WORKFLOWS = [SayHello]
+WORKFLOWS = [AgenticHivemindTemporalWorkflow]
 
-ACTIVITIES = [say_hello]
+ACTIVITIES = [run_hivemind_agent_activity]
