@@ -1,9 +1,8 @@
 from datetime import timedelta
 
+from tasks.hivemind.agent import AgenticHivemindFlow
 from tc_temporal_backend.schema.hivemind import HivemindQueryPayload
 from temporalio import activity, workflow
-
-from tasks.hivemind.agent import AgenticHivemindFlow
 
 
 @activity.defn

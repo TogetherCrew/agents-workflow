@@ -3,9 +3,9 @@ import logging
 import os
 
 from dotenv import load_dotenv
+from registry import ACTIVITIES, WORKFLOWS
 from temporalio.worker import Worker
 
-from registry import ACTIVITIES, WORKFLOWS
 from utils.temporal_client import TemporalClient
 
 
