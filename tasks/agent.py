@@ -1,14 +1,15 @@
 from datetime import timedelta
 
-from temporalio import workflow, activity
-
 from tc_temporal_backend.schema.hivemind import HivemindQueryPayload
+from temporalio import activity, workflow
 
 from tasks.hivemind.agent import AgenticHivemindFlow
 
 
 @activity.defn
-async def run_hivemind_agent_activity(payload: HivemindQueryPayload) -> HivemindQueryPayload:
+async def run_hivemind_agent_activity(
+    payload: HivemindQueryPayload,
+) -> HivemindQueryPayload:
     """
     Activity that instantiates and runs the Crew.ai Flow (AgenticHivemindFlow).
     It places the resulting answer into payload.content.response.
@@ -48,6 +49,6 @@ class AgenticHivemindTemporalWorkflow:
         updated_payload = await workflow.execute_activity(
             run_hivemind_agent_activity,
             payload,
-            schedule_to_close_timeout=timedelta(minutes=5)
+            schedule_to_close_timeout=timedelta(minutes=5),
         )
         return updated_payload

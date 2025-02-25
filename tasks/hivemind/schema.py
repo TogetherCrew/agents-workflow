@@ -5,16 +5,20 @@ class DestinationModel(BaseModel):
     queue: str
     event: str
 
+
 class RouteModel(BaseModel):
     source: str
     destination: DestinationModel | None = None
+
 
 class QuestionModel(BaseModel):
     message: str
     filters: dict | None = None
 
+
 class ResponseModel(BaseModel):
     message: str
+
 
 class AMQPPayload(BaseModel):
     communityId: str
@@ -23,11 +27,13 @@ class AMQPPayload(BaseModel):
     response: ResponseModel | None = None
     metadata: dict | None = None
 
+
 class HTTPPayload(BaseModel):
     communityId: str
     question: QuestionModel
     response: ResponseModel | None = None
     taskId: str
+
 
 class Payload(BaseModel):
     event: str

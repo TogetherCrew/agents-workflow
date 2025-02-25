@@ -1,9 +1,9 @@
 import os
 from uuid import uuid1
-from dotenv import load_dotenv
 
-from tc_temporal_backend.schema.hivemind import HivemindQueryPayload
+from dotenv import load_dotenv
 from tc_temporal_backend.client import TemporalClient
+from tc_temporal_backend.schema.hivemind import HivemindQueryPayload
 
 
 class QueryDataSources:
@@ -34,7 +34,7 @@ class QueryDataSources:
         # print(f"Result: {result}")
 
         return result
-    
+
     def load_hivemind_queue(self) -> str:
         """
         load the hivemind queue name
@@ -43,5 +43,5 @@ class QueryDataSources:
         hivemind_queue = os.getenv("TEMPORAL_HIVEMIND_TASK_QUEUE")
         if not hivemind_queue:
             raise ValueError("env `TEMPORAL_HIVEMIND_TASK_QUEUE` is not loaded!")
-        
+
         return hivemind_queue

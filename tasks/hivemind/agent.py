@@ -1,7 +1,8 @@
+from crewai import Agent, Crew, Task
+from crewai.crews.crew_output import CrewOutput
 from crewai.flow.flow import Flow, listen, start
 from crewai.llm import LLM
-from crewai.crews.crew_output import CrewOutput
-from crewai import Agent, Task, Crew
+
 from tasks.hivemind.classify_question import CheckQuestion
 from tasks.hivemind.query_data_sources import QueryDataSources
 
@@ -10,13 +11,13 @@ class AgenticHivemindFlow(Flow):
     model = "gpt-4o-mini"
 
     def __init__(
-            self,
-            user_query: str,
-            community_id: str,
-            enable_answer_skipping: bool = False,
-            persistence = None,
-            **kwargs
-        ) -> None:
+        self,
+        user_query: str,
+        community_id: str,
+        enable_answer_skipping: bool = False,
+        persistence=None,
+        **kwargs
+    ) -> None:
         self.user_query = user_query
         self.enable_answer_skipping = enable_answer_skipping
         self.community_id = community_id
@@ -67,7 +68,7 @@ class AgenticHivemindFlow(Flow):
                 ),
                 tools=[query_data_sources.query],
                 allow_delegation=True,
-                llm=LLM(model="gpt-4o-mini")
+                llm=LLM(model="gpt-4o-mini"),
             )
 
             math_task = Task(
@@ -76,14 +77,10 @@ class AgenticHivemindFlow(Flow):
                     "otherwise, answer using your internal knowledge. Query: {query}"
                 ),
                 expected_output="The answer of the given query",
-                agent=q_a_bot_agent  
+                agent=q_a_bot_agent,
             )
 
-            crew = Crew(
-                agents=[q_a_bot_agent],
-                tasks=[math_task],
-                verbose=True
-            )
+            crew = Crew(agents=[q_a_bot_agent], tasks=[math_task], verbose=True)
 
             crew_output = crew.kickoff(inputs={"query": query})
 
