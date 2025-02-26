@@ -2,7 +2,7 @@ from crewai import Agent, Crew, Task
 from crewai.crews.crew_output import CrewOutput
 from crewai.flow.flow import Flow, listen, start
 from crewai.llm import LLM
-from tasks.hivemind.classify_question import CheckQuestion
+from tasks.hivemind.classify_question import ClassifyQuestion
 from tasks.hivemind.query_data_sources import QueryDataSources
 
 
@@ -25,7 +25,7 @@ class AgenticHivemindFlow(Flow):
     @start()
     def detect_question(self) -> str:
         if self.enable_answer_skipping:
-            checker = CheckQuestion(model=self.model)
+            checker = ClassifyQuestion(model=self.model)
             question = checker.classify_message(message=self.user_query)
 
             if question:
@@ -38,7 +38,7 @@ class AgenticHivemindFlow(Flow):
     @listen(detect_question)
     def detect_rag_question(self, query: str | None) -> str | None:
         if self.enable_answer_skipping and query:
-            checker = CheckQuestion(model=self.model)
+            checker = ClassifyQuestion(model=self.model)
             rag_question = checker.classify_message_lm(message=query)
             if rag_question:
                 return query

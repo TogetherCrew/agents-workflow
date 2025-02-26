@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from transformers import pipeline
 
 
-class CheckQuestion:
+class ClassifyQuestion:
     def __init__(self, model: str):
         load_dotenv()
         self.model = model
