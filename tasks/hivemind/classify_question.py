@@ -19,7 +19,7 @@ class CheckQuestion:
             
             Message: """
 
-    def classify_message(self, message: str) -> str:
+    def classify_message(self, message: str) -> bool:
         """
         classify if a message is a question or statement using a local model
         """
