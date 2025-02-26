@@ -1,10 +1,10 @@
 from datetime import timedelta
 
 from temporalio import activity, workflow
+
 with workflow.unsafe.imports_passed_through():
     from tasks.hivemind.agent import AgenticHivemindFlow
     from tc_temporal_backend.schema.hivemind import HivemindQueryPayload
-
 
 
 @activity.defn

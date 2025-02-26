@@ -4,8 +4,8 @@ import os
 
 from dotenv import load_dotenv
 from registry import ACTIVITIES, WORKFLOWS
-from temporalio.worker import Worker
 from tc_temporal_backend.client import TemporalClient
+from temporalio.worker import Worker
 
 
 async def main():
