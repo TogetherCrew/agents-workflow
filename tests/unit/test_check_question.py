@@ -1,10 +1,10 @@
 import unittest
 from unittest.mock import patch
+
 from tasks.hivemind.classify_question import ClassifyQuestion
 
 
 class TestClassifyQuestion(unittest.TestCase):
-
     def setUp(self):
         self.model = "gpt-4o-mini"
         self.check_question = ClassifyQuestion(self.model)
