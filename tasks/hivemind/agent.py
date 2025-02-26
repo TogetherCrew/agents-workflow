@@ -48,7 +48,7 @@ class AgenticHivemindFlow(Flow):
             return query
 
     @listen(detect_rag_question)
-    def query(self, query: str | None) -> CrewOutput:
+    def query(self, query: str | None) -> CrewOutput | None:
         if query:
             query_data_sources = QueryDataSources(
                 community_id=self.community_id,

@@ -5,12 +5,14 @@ import os
 from dotenv import load_dotenv
 from registry import ACTIVITIES, WORKFLOWS
 from temporalio.worker import Worker
-from utils.temporal_client import TemporalClient
+from tc_temporal_backend.client import TemporalClient
 
 
 async def main():
-    # Initialize environment
     load_dotenv()
+    logging.basicConfig(level=logging.INFO)
+
+    # Initialize environment
     task_queue = os.getenv("TEMPORAL_TASK_QUEUE")
     if not task_queue:
         raise ValueError("`TEMPORAL_TASK_QUEUE` is not properly set!")

@@ -1,20 +1,21 @@
 from datetime import timedelta
 
-from tasks.hivemind.agent import AgenticHivemindFlow
-from tc_temporal_backend.schema.hivemind import HivemindQueryPayload
 from temporalio import activity, workflow
+with workflow.unsafe.imports_passed_through():
+    from tasks.hivemind.agent import AgenticHivemindFlow
+    from tc_temporal_backend.schema.hivemind import HivemindQueryPayload
+
 
 
 @activity.defn
 async def run_hivemind_agent_activity(
     payload: HivemindQueryPayload,
-) -> HivemindQueryPayload:
+) -> str | None:
     """
     Activity that instantiates and runs the Crew.ai Flow (AgenticHivemindFlow).
     It places the resulting answer into payload.content.response.
     """
     # Instantiate the flow with the user query
-    # (enable_answer_skipping=False here, but you can make it dynamic)
     flow = AgenticHivemindFlow(
         community_id=payload.community_id,
         user_query=payload.query,
@@ -24,7 +25,6 @@ async def run_hivemind_agent_activity(
     # Run the flow
     crew_output = await flow.kickoff_async(inputs={"query": payload.query})
 
-    # crew_output could be None if skipping or any other logic, so handle gracefully
     if crew_output:
         final_answer = crew_output
     elif not payload.enable_answer_skipping:
@@ -43,7 +43,7 @@ class AgenticHivemindTemporalWorkflow:
     """
 
     @workflow.run
-    async def run(self, payload: HivemindQueryPayload) -> HivemindQueryPayload:
+    async def run(self, payload: HivemindQueryPayload) -> str | None:
         # Execute the activity with a timeout
         updated_payload = await workflow.execute_activity(
             run_hivemind_agent_activity,
