@@ -26,6 +26,7 @@ services:
       - POSTGRES_SEEDS=temporal-postgresql
       - CHUNK_SIZE=512
       - EMBEDDING_DIM=1024
+      - TEMPORAL_HIVEMIND_TASK_QUEUE=QUEUE_HEAVY
     volumes:
       - ./coverage:/project/coverage
     depends_on:
