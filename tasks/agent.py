@@ -26,7 +26,7 @@ async def run_hivemind_agent_activity(
     crew_output = await flow.kickoff_async(inputs={"query": payload.query})
 
     if crew_output:
-        final_answer = crew_output
+        final_answer = crew_output.raw
     elif not payload.enable_answer_skipping:
         final_answer = "No answer was generated."
     else:
