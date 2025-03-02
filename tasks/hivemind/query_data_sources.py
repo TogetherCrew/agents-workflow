@@ -1,10 +1,11 @@
 import os
 from uuid import uuid1
 
-from dotenv import load_dotenv
 from crewai.tools import tool
+from dotenv import load_dotenv
 from tc_temporal_backend.client import TemporalClient
 from tc_temporal_backend.schema.hivemind import HivemindQueryPayload
+
 
 class QueryDataSources:
     def __init__(self, community_id: str, enable_answer_skipping: bool):
