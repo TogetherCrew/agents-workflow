@@ -2,15 +2,16 @@ import os
 from uuid import uuid1
 
 from dotenv import load_dotenv
+from crewai.tools import tool
 from tc_temporal_backend.client import TemporalClient
 from tc_temporal_backend.schema.hivemind import HivemindQueryPayload
-
 
 class QueryDataSources:
     def __init__(self, community_id: str, enable_answer_skipping: bool):
         self.community_id = community_id
         self.enable_answer_skipping = enable_answer_skipping
 
+    @tool
     async def query(self, query: str) -> str:
         """
         query data sources for the given community
@@ -30,8 +31,6 @@ class QueryDataSources:
             id=f"hivemind-query-{self.community_id}-{uuid1()}",
             task_queue=hivemind_queue,
         )
-        # TODO: serialize the results
-        # print(f"Result: {result}")
 
         return result
 
