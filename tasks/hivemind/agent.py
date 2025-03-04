@@ -3,7 +3,7 @@ from crewai.crews.crew_output import CrewOutput
 from crewai.flow.flow import Flow, listen, start
 from crewai.llm import LLM
 from tasks.hivemind.classify_question import ClassifyQuestion
-from tasks.hivemind.query_data_sources import QueryDataSources
+from tasks.hivemind.query_data_sources import QueryDataSourcesTool
 
 
 class AgenticHivemindFlow(Flow):
@@ -50,7 +50,7 @@ class AgenticHivemindFlow(Flow):
     @listen(detect_rag_question)
     def query(self, query: str | None) -> CrewOutput | None:
         if query:
-            query_data_sources = QueryDataSources(
+            query_data_source_tool = QueryDataSourcesTool.setup_tools(
                 community_id=self.community_id,
                 enable_answer_skipping=self.enable_answer_skipping,
             )
@@ -65,7 +65,9 @@ class AgenticHivemindFlow(Flow):
                     "You are an intelligent agent capable of answering questions using either your internal LLM knowledge "
                     "or a Retrieval-Augmented Generation (RAG) pipeline to fetch community-specific data."
                 ),
-                tools=[query_data_sources.query],
+                tools=[
+                    query_data_source_tool(result_as_answer=True),
+                ],
                 allow_delegation=True,
                 llm=LLM(model="gpt-4o-mini"),
             )

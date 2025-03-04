@@ -1,6 +1,7 @@
 from datetime import timedelta
 
 from temporalio import activity, workflow
+from temporalio.common import RetryPolicy
 
 with workflow.unsafe.imports_passed_through():
     from tasks.hivemind.agent import AgenticHivemindFlow
@@ -49,5 +50,6 @@ class AgenticHivemindTemporalWorkflow:
             run_hivemind_agent_activity,
             payload,
             schedule_to_close_timeout=timedelta(minutes=5),
+            retry_policy=RetryPolicy(maximum_attempts=3),
         )
         return updated_payload
