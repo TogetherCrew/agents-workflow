@@ -49,7 +49,7 @@ class AgenticHivemindTemporalWorkflow:
         updated_payload = await workflow.execute_activity(
             run_hivemind_agent_activity,
             payload,
-            schedule_to_close_timeout=timedelta(minutes=5),
+            schedule_to_close_timeout=timedelta(minutes=6),
             retry_policy=RetryPolicy(maximum_attempts=3),
         )
         return updated_payload
