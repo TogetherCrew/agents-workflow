@@ -1,6 +1,6 @@
 import os
 
-import openai
+from openai import OpenAI
 from dotenv import load_dotenv
 from transformers import pipeline
 
@@ -37,17 +37,18 @@ class ClassifyQuestion:
         """
         Classify message using a language model
         """
+        client = OpenAI()
         prompt = self.question_check_prompt + message
-        response = openai.ChatCompletion.create(
+
+        response = client.chat.completions.create(
             model=self.model,
             messages=[
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": prompt},
             ],
-            api_key=self.api_key,
         )
 
-        response_text = response["choices"][0]["message"]["content"].strip().lower()
+        response_text = response.choices[0].message.content.strip().lower()
 
         if "true" in response_text:
             return True
