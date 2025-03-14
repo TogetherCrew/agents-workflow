@@ -72,7 +72,7 @@ class AgenticHivemindFlow(Flow):
                 llm=LLM(model="gpt-4o-mini"),
             )
 
-            math_task = Task(
+            rag_task = Task(
                 description=(
                     "Answer the following query. If the query is specific to community data, use the tool to retrieve updated information; "
                     "otherwise, answer using your internal knowledge. Query: {query}"
@@ -81,7 +81,7 @@ class AgenticHivemindFlow(Flow):
                 agent=q_a_bot_agent,
             )
 
-            crew = Crew(agents=[q_a_bot_agent], tasks=[math_task], verbose=True)
+            crew = Crew(agents=[q_a_bot_agent], tasks=[rag_task], verbose=True)
 
             crew_output = crew.kickoff(inputs={"query": query})
 
