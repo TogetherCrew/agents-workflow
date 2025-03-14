@@ -43,7 +43,9 @@ class TestClassifyQuestion(unittest.TestCase):
 
         mock_openai.return_value.chat.completions.create.return_value = mock_response
 
-        result = self.check_question.classify_message_lm("What is the capital of France?")
+        result = self.check_question.classify_message_lm(
+            "What is the capital of France?"
+        )
         self.assertTrue(result)
 
     @patch("tasks.hivemind.classify_question.OpenAI")
@@ -66,7 +68,6 @@ class TestClassifyQuestion(unittest.TestCase):
     @patch("tasks.hivemind.classify_question.OpenAI")
     def test_classify_message_lm_invalid_response(self, mock_openai):
         # Test that classify_message_lm raises ValueError for an invalid response from OpenAI API
-
 
         mock_response = Mock()
         mock_choice = Mock()
