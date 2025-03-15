@@ -4,6 +4,7 @@ from temporalio import activity, workflow
 from temporalio.common import RetryPolicy
 
 with workflow.unsafe.imports_passed_through():
+    from crewai.crews.crew_output import CrewOutput
     from tasks.hivemind.agent import AgenticHivemindFlow
     from tc_temporal_backend.schema.hivemind import HivemindQueryPayload
 
@@ -26,7 +27,7 @@ async def run_hivemind_agent_activity(
     # Run the flow
     crew_output = await flow.kickoff_async(inputs={"query": payload.query})
 
-    if crew_output:
+    if isinstance(crew_output, CrewOutput):
         final_answer = crew_output.raw
     elif not payload.enable_answer_skipping:
         final_answer = "No answer was generated."
