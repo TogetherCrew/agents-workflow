@@ -3,7 +3,7 @@ from crewai.crews.crew_output import CrewOutput
 from crewai.flow.flow import Flow, listen, start
 from crewai.llm import LLM
 from tasks.hivemind.classify_question import ClassifyQuestion
-from tasks.hivemind.query_data_sources import QueryDataSourcesTool
+from tasks.hivemind.query_data_sources import RAGPipelineTool
 
 
 class AgenticHivemindFlow(Flow):
@@ -25,7 +25,7 @@ class AgenticHivemindFlow(Flow):
     @start()
     def detect_question(self) -> str:
         if self.enable_answer_skipping:
-            checker = ClassifyQuestion(model=self.model)
+            checker = ClassifyQuestion()
             question = checker.classify_message(message=self.user_query)
 
             if question:
@@ -50,7 +50,7 @@ class AgenticHivemindFlow(Flow):
     @listen(detect_rag_question)
     def query(self, query: str | None) -> CrewOutput | None:
         if query:
-            query_data_source_tool = QueryDataSourcesTool.setup_tools(
+            query_data_source_tool = RAGPipelineTool.setup_tools(
                 community_id=self.community_id,
                 enable_answer_skipping=self.enable_answer_skipping,
             )

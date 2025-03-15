@@ -9,10 +9,7 @@ from tc_temporal_backend.schema.hivemind import HivemindQueryPayload
 
 nest_asyncio.apply()
 
-from typing import Type
-
 from crewai.tools import BaseTool
-from pydantic import BaseModel, Field
 
 
 class QueryDataSources:
@@ -59,28 +56,45 @@ class QueryDataSources:
         return hivemind_queue
 
 
-class QueryDataSourcesInput(BaseModel):
-    """Input schema for QueryDataSourcesInput."""
-
-    query: str = Field(..., description="The query to apply on data sources.")
-
-
-class QueryDataSourcesTool(BaseTool):
-    name: str = "Query Data sources"
-    description: str = "Query available data sources to find the answer."
-    args_schema: Type[BaseModel] = QueryDataSourcesInput
+class RAGPipelineTool(BaseTool):
+    name: str = "RAG pipeline tool"
+    description: str = (
+        "This tool implements a Retrieval-Augmented Generation (RAG) pipeline which "
+        "queries available data sources to provide accurate answers to user queries. "
+    )
 
     @classmethod
     def setup_tools(cls, community_id: str, enable_answer_skipping: bool):
+        """
+        Setup the tool with the necessary community identifier and the flag to enable answer skipping.
+        """
         cls.community_id = community_id
         cls.enable_answer_skipping = enable_answer_skipping
-
         return cls
 
-    def _run(self, query: str) -> str:
+    def _run(self, query: str | dict) -> str | None:
+        """
+        Execute the RAG pipeline by querying the available data sources.
+
+        Parameters
+        ------------
+        query : str
+            The input query string provided by the user.
+
+        Returns
+        ----------
+        response : str
+            The response obtained after querying the data sources.
+        """
         query_data_sources = QueryDataSources(
             community_id=self.community_id,
             enable_answer_skipping=self.enable_answer_skipping,
         )
-        response = asyncio.run(query_data_sources.query(query))
+
+        # manually handling the edge case of the LLM
+        # it sometimes gives dictionary (hallucinating)
+        if isinstance(query, str):
+            response = asyncio.run(query_data_sources.query(query))
+        else:
+            response = asyncio.run(query_data_sources.query(query["description"]))
         return response
