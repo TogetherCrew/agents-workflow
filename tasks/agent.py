@@ -1,3 +1,4 @@
+import logging
 from datetime import timedelta
 
 from temporalio import activity, workflow
@@ -33,6 +34,10 @@ async def run_hivemind_agent_activity(
         final_answer = "No answer was generated."
     else:
         final_answer = None
+
+    if "encountered an error" in final_answer.lower():
+        logging.error(f"final_answer: {final_answer}")
+        final_answer = "Looks like things didn't go through. Please give it another go."
 
     return final_answer
 
