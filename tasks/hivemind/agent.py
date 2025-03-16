@@ -7,7 +7,7 @@ from tasks.hivemind.query_data_sources import RAGPipelineTool
 
 
 class AgenticHivemindFlow(Flow):
-    model = "gpt-4o-mini"
+    model = "gpt-4o"
 
     def __init__(
         self,
