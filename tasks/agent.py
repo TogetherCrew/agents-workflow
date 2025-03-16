@@ -35,7 +35,7 @@ async def run_hivemind_agent_activity(
     else:
         final_answer = None
 
-    if "encountered an error" in final_answer.lower():
+    if isinstance(final_answer, str) and "encountered an error" in final_answer.lower():
         logging.error(f"final_answer: {final_answer}")
         final_answer = "Looks like things didn't go through. Please give it another go."
 
