@@ -17,7 +17,7 @@ class QueryDataSources:
         self.community_id = community_id
         self.enable_answer_skipping = enable_answer_skipping
 
-    async def query(self, query: str) -> str:
+    async def query(self, query: str) -> str | None:
         """
         query data sources for the given community
 
@@ -72,7 +72,7 @@ class RAGPipelineTool(BaseTool):
         cls.enable_answer_skipping = enable_answer_skipping
         return cls
 
-    def _run(self, query: str | dict) -> str | None:
+    def _run(self, query: str | dict) -> str:
         """
         Execute the RAG pipeline by querying the available data sources.
 
@@ -97,4 +97,9 @@ class RAGPipelineTool(BaseTool):
             response = asyncio.run(query_data_sources.query(query))
         else:
             response = asyncio.run(query_data_sources.query(query["description"]))
-        return response
+
+        # crewai doesn't let the tool to return `None`
+        if response is None:
+            return "NONE"
+        else:
+            return response

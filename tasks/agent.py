@@ -39,7 +39,10 @@ async def run_hivemind_agent_activity(
         logging.error(f"final_answer: {final_answer}")
         final_answer = "Looks like things didn't go through. Please give it another go."
 
-    return final_answer
+    if final_answer == "NONE":
+        return None
+    else:
+        return final_answer
 
 
 @workflow.defn
