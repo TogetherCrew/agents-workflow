@@ -4,8 +4,10 @@ from uuid import uuid1
 
 import nest_asyncio
 from dotenv import load_dotenv
+from typing import Type
 from tc_temporal_backend.client import TemporalClient
 from tc_temporal_backend.schema.hivemind import HivemindQueryPayload
+from pydantic import BaseModel, Field
 
 nest_asyncio.apply()
 
@@ -56,12 +58,25 @@ class QueryDataSources:
         return hivemind_queue
 
 
+class RAGPipelineToolSchema(BaseModel):
+    """Input schema for RAGPipelineTool."""
+
+    query: str = Field(
+        ...,
+        description=(
+            "The input query string provided by the user. The name is case sensitive."
+            "Please provide a value of type string. This parameter is required."
+        ),
+    )
+
+
 class RAGPipelineTool(BaseTool):
     name: str = "RAG pipeline tool"
     description: str = (
         "This tool implements a Retrieval-Augmented Generation (RAG) pipeline which "
         "queries available data sources to provide accurate answers to user queries. "
     )
+    args_schema: Type[BaseModel] = RAGPipelineToolSchema
 
     @classmethod
     def setup_tools(cls, community_id: str, enable_answer_skipping: bool):
@@ -72,7 +87,7 @@ class RAGPipelineTool(BaseTool):
         cls.enable_answer_skipping = enable_answer_skipping
         return cls
 
-    def _run(self, query: str | dict) -> str:
+    def _run(self, query: str) -> str:
         """
         Execute the RAG pipeline by querying the available data sources.
 
@@ -90,13 +105,7 @@ class RAGPipelineTool(BaseTool):
             community_id=self.community_id,
             enable_answer_skipping=self.enable_answer_skipping,
         )
-
-        # manually handling the edge case of the LLM
-        # it sometimes gives dictionary (hallucinating)
-        if isinstance(query, str):
-            response = asyncio.run(query_data_sources.query(query))
-        else:
-            response = asyncio.run(query_data_sources.query(query["description"]))
+        response = asyncio.run(query_data_sources.query(query))
 
         # crewai doesn't let the tool to return `None`
         if response is None:
