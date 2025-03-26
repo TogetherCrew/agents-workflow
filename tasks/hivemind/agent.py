@@ -58,7 +58,7 @@ class AgenticHivemindFlow(Flow[AgenticFlowState]):
             return "stop"
 
     @listen("stop")
-    def detect_stop_state(self) -> str:
+    def detect_stop_state(self) -> CrewOutput | None:
         return self.state.last_answer
 
     @listen("continue")
