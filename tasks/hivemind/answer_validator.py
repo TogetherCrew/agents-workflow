@@ -9,7 +9,6 @@ class AnswerValidator:
     def __init__(self, model: str = "gpt-4o-mini-2024-07-18"):
         load_dotenv()
         self.model = model
-        self.api_key = os.getenv("OPENAI_API_KEY")
 
         class ValidatorSchema(BaseModel):
             relative: bool
@@ -23,7 +22,7 @@ class AnswerValidator:
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a helpful assistant that validates the if the answer is relative to the question or not.",
+                    "content": "You are a helpful assistant that checks whether the answer is relevant to the question.",
                 },
                 {
                     "role": "user",
