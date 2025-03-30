@@ -72,7 +72,8 @@ class AgenticHivemindFlow(Flow[AgenticFlowState]):
             role="Q&A Bot",
             goal=(
                 "You decide when to rely on your internal knowledge and when to retrieve real-time data. "
-                "For queries that are not specific to community data, answer using your own LLM knowledge."
+                "For queries that are not specific to community data, answer using your own LLM knowledge. "
+                "Your answers should be less than 2000 characters."
             ),
             backstory=(
                 "You are an intelligent agent capable of answering questions using either your internal LLM knowledge "
@@ -88,7 +89,7 @@ class AgenticHivemindFlow(Flow[AgenticFlowState]):
         rag_task = Task(
             description=(
                 "Answer the following query. If the query is specific to community data, use the tool to retrieve updated information; "
-                f"otherwise, answer using your internal knowledge and keep the answer less than 2000 characters. Query: {self.state.user_query}"
+                f"otherwise, answer using your internal knowledge. Query: {self.state.user_query}"
             ),
             expected_output="The answer of the given query",
             agent=q_a_bot_agent,
