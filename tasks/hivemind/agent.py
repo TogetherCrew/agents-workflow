@@ -1,5 +1,5 @@
 from crewai import Agent, Crew, Task
-from crewai.crews.crew_output import CrewOutput
+from crewai.crews.crew_output import CrewOutput, TaskOutput
 from crewai.flow.flow import Flow, listen, start, router
 from crewai.llm import LLM
 from tasks.hivemind.classify_question import ClassifyQuestion
@@ -63,47 +63,109 @@ class AgenticHivemindFlow(Flow[AgenticFlowState]):
 
     @listen("continue")
     def query(self) -> CrewOutput | str:
+        # Setup RAG pipeline tool
         query_data_source_tool = RAGPipelineTool.setup_tools(
             community_id=self.community_id,
             enable_answer_skipping=self.enable_answer_skipping,
         )
 
+        # Q&A Bot Agent setup
         q_a_bot_agent = Agent(
-            role="Q&A Bot",
+            role="RAG Bot",
             goal=(
-                "You decide when to rely on your internal knowledge and when to retrieve real-time data. "
-                "For queries that are not specific to community data, answer using your own LLM knowledge. "
+                "Retrieve and provide relevant information from the community data. "
                 "Your final response must not exceed 250 words."
             ),
             backstory=(
-                "You are an intelligent agent capable of giving concise answers to questions using either your internal LLM knowledge "
-                "or a Retrieval-Augmented Generation (RAG) pipeline to fetch community-specific data."
+                "You are an intelligent agent specialized in retrieving and presenting community-specific data "
+                "using a Retrieval-Augmented Generation (RAG) pipeline."
             ),
-            tools=[
-                query_data_source_tool(result_as_answer=True),
-            ],
+            tools=[query_data_source_tool(result_as_answer=True)],
             allow_delegation=True,
             llm=LLM(model="gpt-4o-mini"),
         )
 
+        # Direct LLM Agent setup
+        llm_agent = Agent(
+            role="Direct LLM",
+            goal="Provide accurate answers using internal knowledge only",
+            backstory="You are an intelligent agent that answers questions using your built-in knowledge",
+            llm=LLM(model="gpt-4o-mini"),
+        )
+
+        # Create tasks for both agents
         rag_task = Task(
             description=(
                 "Answer the following query using a maximum of 250 words. "
-                "If the query is specific to community data, use the tool to retrieve updated information; "
-                f"otherwise, answer using your internal knowledge.\n\nQuery: {self.state.user_query}"
+                "Use the provided tool to retrieve community-specific information.\n\n"
+                f"Query: {self.state.user_query}"
             ),
-            expected_output="The answer to the given query, not exceeding 250 words",
+            expected_output="The answer to the given query based on community data, not exceeding 250 words",
             agent=q_a_bot_agent,
         )
 
-        crew = Crew(agents=[q_a_bot_agent], tasks=[rag_task], verbose=True)
-        crew_output = crew.kickoff(inputs={"query": self.state.user_query})
+        llm_task = Task(
+            description=(
+                "Answer the following query using a maximum of 250 words. "
+                f"Answer the following query using your internal knowledge only: {self.state.user_query}"
+            ),
+            expected_output="A clear and concise answer to the query, not exceeding 250 words",
+            agent=llm_agent,
+        )
 
-        # Store the latest crew output and increment retry count
-        self.state.last_answer = crew_output
+        # Create and run crews in parallel
+        crew = Crew(
+            agents=[q_a_bot_agent, llm_agent],
+            tasks=[rag_task, llm_task],
+            verbose=True,
+            process_parallel=True,
+        )
+
+        crew_outputs = crew.kickoff(inputs={"query": self.state.user_query})
+
+        # Compare answers and select the best one
+        final_output = self._compare_answers(
+            rag_answer=crew_outputs.tasks_output[0],
+            llm_answer=crew_outputs.tasks_output[1],
+            question=self.state.user_query,
+        )
+
+        # Store the final output and increment retry count
+        self.state.last_answer = final_output
         self.state.retry_count += 1
 
-        return crew_output
+        return final_output
+
+    def _compare_answers(
+        self, rag_answer: TaskOutput, llm_answer: TaskOutput, question: str
+    ) -> TaskOutput:
+        compare_agent = Agent(
+            role="Answer Comparator",
+            goal="Compare answers and select the most informative one",
+            backstory="You are an expert at evaluating answer quality and relevance",
+            llm=LLM(model=self.model),
+        )
+
+        compare_task = Task(
+            description=(
+                f"Compare these two answers to the question: '{question}'\n\n"
+                f"RAG Answer: {rag_answer.raw}\n\n"
+                f"LLM Answer: {llm_answer.raw}\n\n"
+                "Determine if the RAG answer is not informative at all and send back the LLM Answer."
+                "Consider factors like specificity, accuracy, and completeness."
+            ),
+            expected_output="The better answer between the two options",
+            agent=compare_agent,
+        )
+
+        crew = Crew(agents=[compare_agent], tasks=[compare_task], verbose=True)
+        comparison_result = crew.kickoff()
+
+        # Return the appropriate answer based on the comparison
+        if "RAG" in comparison_result.raw.upper():
+            return rag_answer
+        else:
+            return llm_answer
 
     @router(query)
     def check_answer_validity(self, crew_output: CrewOutput) -> str:
