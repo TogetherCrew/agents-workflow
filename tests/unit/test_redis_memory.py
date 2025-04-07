@@ -26,8 +26,7 @@ class TestRedisMemory(unittest.TestCase):
         self.redis_mock = self.redis_patcher.start()
 
         # Create instance of RedisMemory with mocked dependencies
-        self.memory = RedisMemory()
-
+        self.memory = RedisMemory(key='test_key')
     def tearDown(self):
         """Clean up after tests"""
         self.env_patcher.stop()
