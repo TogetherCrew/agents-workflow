@@ -17,7 +17,7 @@ class TestRedisMemoryIntegration(unittest.TestCase):
 
     def setUp(self):
         """Set up before each test"""
-        self.memory = RedisMemory()
+        self.memory = RedisMemory(key='test_key')
         # Clean up any existing test keys
         self.test_keys = ["test_key1", "test_key2", "test_key3"]
         for key in self.test_keys:
