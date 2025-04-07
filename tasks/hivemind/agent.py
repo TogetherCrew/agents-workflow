@@ -13,6 +13,7 @@ class AgenticFlowState(BaseModel):
     retry_count: int = 0
     last_answer: CrewOutput | None = None
     state: str = "continue"
+    chat_history: str | None = None
 
 
 class AgenticHivemindFlow(Flow[AgenticFlowState]):
@@ -23,6 +24,7 @@ class AgenticHivemindFlow(Flow[AgenticFlowState]):
         user_query: str,
         community_id: str,
         enable_answer_skipping: bool = False,
+        chat_history: str | None = None,
         persistence=None,
         max_retry_count: int = 3,
         **kwargs,
@@ -33,6 +35,7 @@ class AgenticHivemindFlow(Flow[AgenticFlowState]):
         super().__init__(persistence, **kwargs)
 
         self.state.user_query = user_query
+        self.state.chat_history = chat_history
 
     @start()
     def detect_question(self):
@@ -78,6 +81,9 @@ class AgenticHivemindFlow(Flow[AgenticFlowState]):
             backstory=(
                 "You are an intelligent agent capable of giving concise answers to questions using either your internal LLM knowledge "
                 "or a Retrieval-Augmented Generation (RAG) pipeline to fetch community-specific data."
+                f"Chat History: {self.state.chat_history}"
+                if self.state.chat_history
+                else ""
             ),
             tools=[
                 query_data_source_tool(result_as_answer=True),
@@ -92,7 +98,7 @@ class AgenticHivemindFlow(Flow[AgenticFlowState]):
                 "If the query is specific to community data, use the tool to retrieve updated information; "
                 f"otherwise, answer using your internal knowledge.\n\nQuery: {self.state.user_query}"
             ),
-            expected_output="The answer to the given query, not exceeding 250 words",
+            expected_output="A clear, well-structured answer under 250 words that directly addresses the query using appropriate information sources",
             agent=q_a_bot_agent,
         )
 

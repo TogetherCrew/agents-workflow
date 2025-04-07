@@ -34,6 +34,8 @@ class QueryDataSources:
             community_id=self.community_id,
             query=query,
             enable_answer_skipping=self.enable_answer_skipping,
+            # chat_id is not used in the HivemindWorkflow
+            chat_id="",
         )
 
         hivemind_queue = self.load_hivemind_queue()

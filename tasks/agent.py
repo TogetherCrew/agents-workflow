@@ -7,6 +7,7 @@ from temporalio.common import RetryPolicy
 with workflow.unsafe.imports_passed_through():
     from crewai.crews.crew_output import CrewOutput
     from tasks.hivemind.agent import AgenticHivemindFlow
+    from tasks.redis_memory import RedisMemory
     from tc_temporal_backend.schema.hivemind import HivemindQueryPayload
 
 
@@ -18,11 +19,23 @@ async def run_hivemind_agent_activity(
     Activity that instantiates and runs the Crew.ai Flow (AgenticHivemindFlow).
     It places the resulting answer into payload.content.response.
     """
+
+    memory: RedisMemory | None
+    chat_history: str | None
+
+    if payload.chat_id:
+        memory = RedisMemory(key=f"conversation:{payload.chat_id}")
+        chat_history = memory.get_text()
+    else:
+        chat_history = None
+        memory = None
+
     # Instantiate the flow with the user query
     flow = AgenticHivemindFlow(
         community_id=payload.community_id,
         user_query=payload.query,
         enable_answer_skipping=payload.enable_answer_skipping,
+        chat_history=chat_history,
     )
 
     # Run the flow
@@ -38,6 +51,10 @@ async def run_hivemind_agent_activity(
     if isinstance(final_answer, str) and "encountered an error" in final_answer.lower():
         logging.error(f"final_answer: {final_answer}")
         final_answer = "Looks like things didn't go through. Please give it another go."
+
+    if memory and final_answer != "NONE":
+        chat = f"User: {payload.query}\nAgent: {final_answer}"
+        memory.append_text(chat)
 
     if final_answer == "NONE":
         return None
