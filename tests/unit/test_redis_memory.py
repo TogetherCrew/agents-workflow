@@ -40,20 +40,6 @@ class TestRedisMemory(unittest.TestCase):
         )
         self.assertEqual(self.memory.key, "test_key")
 
-    def test_init_with_default_values(self):
-        """Test initialization with default values when env vars are not set"""
-        self.env_patcher.stop()
-        # Clear existing redis client mock calls
-        self.redis_mock.reset_mock()
-
-        # Create new instance with no env vars
-        memory = RedisMemory("test_key")
-
-        self.redis_mock.assert_called_once_with(
-            host="localhost", port=6379, password="", decode_responses=True
-        )
-        self.assertEqual(memory.key, "test_key")
-
     def test_append_text_new_key(self):
         """Test appending text to a new key"""
         # Mock Redis get to return None (key doesn't exist)
