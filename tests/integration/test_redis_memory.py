@@ -21,7 +21,7 @@ class TestRedisMemoryIntegration(unittest.TestCase):
         self.memory1 = RedisMemory("test_key1")
         self.memory2 = RedisMemory("test_key2")
         self.memory3 = RedisMemory("test_key3")
-        
+
         # Clean up any existing test keys
         self.memory1.delete_text()
         self.memory2.delete_text()
