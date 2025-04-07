@@ -76,8 +76,8 @@ class AgenticHivemindFlow(Flow[AgenticFlowState]):
             role="Q&A Bot",
             goal=(
                 "You decide when to rely on your internal knowledge and when to retrieve real-time data. "
-                "For queries that are not specific to community data, answer using your own LLM knowledge."
-            ),
+                "For queries that are not specific to community data, answer using your own LLM knowledge. "
+                "Your final response must not exceed 250 words."            ),
             backstory=(
                 "You are an intelligent agent capable of giving concise answers to questions using either your internal LLM knowledge "
                 "or a Retrieval-Augmented Generation (RAG) pipeline to fetch community-specific data."
