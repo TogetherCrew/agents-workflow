@@ -1,3 +1,4 @@
+import logging
 import redis
 from typing import Optional
 import os
@@ -62,7 +63,7 @@ class RedisMemory:
 
             return success
         except Exception as e:
-            print(f"Error appending text to Redis: {e}")
+            logging.error(f"Error appending text to Redis: {e}")
             return False
 
     def get_text(self) -> Optional[str]:
@@ -76,7 +77,7 @@ class RedisMemory:
         try:
             return self.redis_client.get(self.key)
         except Exception as e:
-            print(f"Error getting text from Redis: {e}")
+            logging.error(f"Error getting text from Redis: {e}")
             return None
 
     def delete_text(self) -> bool:
@@ -90,5 +91,5 @@ class RedisMemory:
         try:
             return bool(self.redis_client.delete(self.key))
         except Exception as e:
-            print(f"Error deleting text from Redis: {e}")
+            logging.error(f"Error deleting text from Redis: {e}")
             return False
