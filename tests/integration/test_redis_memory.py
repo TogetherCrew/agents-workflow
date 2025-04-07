@@ -17,123 +17,120 @@ class TestRedisMemoryIntegration(unittest.TestCase):
 
     def setUp(self):
         """Set up before each test"""
-        self.memory = RedisMemory(key='test_key')
+        # Create instances with different keys
+        self.memory1 = RedisMemory("test_key1")
+        self.memory2 = RedisMemory("test_key2")
+        self.memory3 = RedisMemory("test_key3")
+        
         # Clean up any existing test keys
-        self.test_keys = ["test_key1", "test_key2", "test_key3"]
-        for key in self.test_keys:
-            self.memory.delete_text(key)
+        self.memory1.delete_text()
+        self.memory2.delete_text()
+        self.memory3.delete_text()
 
     def tearDown(self):
         """Clean up after each test"""
         # Clean up test keys
-        for key in self.test_keys:
-            self.memory.delete_text(key)
+        self.memory1.delete_text()
+        self.memory2.delete_text()
+        self.memory3.delete_text()
 
     def test_append_and_get_text(self):
         """Test appending and retrieving text from Redis"""
-        key = "test_key1"
-
         # Test initial append
-        success = self.memory.append_text(key, "Hello ")
+        success = self.memory1.append_text("Hello ")
         self.assertTrue(success)
 
         # Verify the text was stored
-        result = self.memory.get_text(key)
+        result = self.memory1.get_text()
         self.assertEqual(result, "Hello ")
 
         # Test appending more text
-        success = self.memory.append_text(key, "World!")
+        success = self.memory1.append_text("World!")
         self.assertTrue(success)
 
         # Verify the combined text
-        result = self.memory.get_text(key)
+        result = self.memory1.get_text()
         self.assertEqual(result, "Hello World!")
 
     def test_multiple_keys(self):
         """Test handling multiple keys simultaneously"""
         # Store different values in different keys
-        self.memory.append_text("test_key1", "First value")
-        self.memory.append_text("test_key2", "Second value")
+        self.memory1.append_text("First value")
+        self.memory2.append_text("Second value")
 
         # Verify each key has correct value
-        self.assertEqual(self.memory.get_text("test_key1"), "First value")
-        self.assertEqual(self.memory.get_text("test_key2"), "Second value")
+        self.assertEqual(self.memory1.get_text(), "First value")
+        self.assertEqual(self.memory2.get_text(), "Second value")
 
     def test_delete_text(self):
         """Test deleting text from Redis"""
-        key = "test_key1"
-
         # Store some text
-        self.memory.append_text(key, "Delete me")
+        self.memory1.append_text("Delete me")
 
         # Verify text exists
-        self.assertIsNotNone(self.memory.get_text(key))
+        self.assertIsNotNone(self.memory1.get_text())
 
         # Delete the text
-        success = self.memory.delete_text(key)
+        success = self.memory1.delete_text()
         self.assertTrue(success)
 
         # Verify text is gone
-        self.assertIsNone(self.memory.get_text(key))
+        self.assertIsNone(self.memory1.get_text())
 
     def test_nonexistent_key(self):
         """Test behavior with nonexistent keys"""
         # Try to get nonexistent key
-        result = self.memory.get_text("nonexistent_key")
+        result = self.memory1.get_text()
         self.assertIsNone(result)
 
         # Try to delete nonexistent key
-        success = self.memory.delete_text("nonexistent_key")
+        success = self.memory1.delete_text()
         self.assertFalse(success)
 
     def test_expiration(self):
         """Test that keys expire after the timeout period"""
-        key = "test_key3"
-
-        # Override timeout for testing (2 seconds instead of 2 hours)
-        original_timeout = self.memory.timeout
-        self.memory.timeout = 2
+        # Override timeout for testing (2 seconds instead of 15 minutes)
+        original_timeout = self.memory3.timeout
+        self.memory3.timeout = 2
 
         try:
             # Store some text
-            self.memory.append_text(key, "Temporary text")
+            self.memory3.append_text("Temporary text")
 
             # Verify text exists
-            self.assertEqual(self.memory.get_text(key), "Temporary text")
+            self.assertEqual(self.memory3.get_text(), "Temporary text")
 
             # Wait for expiration
             time.sleep(3)
 
             # Verify text is gone
-            self.assertIsNone(self.memory.get_text(key))
+            self.assertIsNone(self.memory3.get_text())
 
         finally:
             # Restore original timeout
-            self.memory.timeout = original_timeout
+            self.memory3.timeout = original_timeout
 
     def test_append_to_expired_key(self):
         """Test appending text to a key that has expired"""
-        key = "test_key3"
-
         # Override timeout for testing
-        original_timeout = self.memory.timeout
-        self.memory.timeout = 2
+        original_timeout = self.memory3.timeout
+        self.memory3.timeout = 2
 
         try:
             # Store initial text
-            self.memory.append_text(key, "Initial ")
+            self.memory3.append_text("Initial ")
 
             # Wait for expiration
             time.sleep(3)
 
             # Append to expired key
-            success = self.memory.append_text(key, "New text")
+            success = self.memory3.append_text("New text")
             self.assertTrue(success)
 
             # Verify only new text exists
-            result = self.memory.get_text(key)
+            result = self.memory3.get_text()
             self.assertEqual(result, "New text")
 
         finally:
             # Restore original timeout
-            self.memory.timeout = original_timeout
+            self.memory3.timeout = original_timeout

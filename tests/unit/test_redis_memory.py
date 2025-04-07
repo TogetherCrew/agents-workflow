@@ -37,6 +37,7 @@ class TestRedisMemory(unittest.TestCase):
         self.redis_mock.assert_called_once_with(
             host="test-host", port=6379, password="test-password", decode_responses=True
         )
+        self.assertEqual(self.memory.key, "test_key")
 
     def test_init_with_default_values(self):
         """Test initialization with default values when env vars are not set"""
@@ -45,11 +46,12 @@ class TestRedisMemory(unittest.TestCase):
         self.redis_mock.reset_mock()
 
         # Create new instance with no env vars
-        memory = RedisMemory()
+        memory = RedisMemory("test_key")
 
         self.redis_mock.assert_called_once_with(
             host="localhost", port=6379, password="", decode_responses=True
         )
+        self.assertEqual(memory.key, "test_key")
 
     def test_append_text_new_key(self):
         """Test appending text to a new key"""
@@ -57,11 +59,11 @@ class TestRedisMemory(unittest.TestCase):
         self.redis_client_mock.get.return_value = None
         self.redis_client_mock.setex.return_value = True
 
-        result = self.memory.append_text("new_key", "test text")
+        result = self.memory.append_text("test text")
 
-        self.redis_client_mock.get.assert_called_once_with("new_key")
+        self.redis_client_mock.get.assert_called_once_with("test_key")
         self.redis_client_mock.setex.assert_called_once()
-        self.assertEqual(self.redis_client_mock.setex.call_args[0][0], "new_key")
+        self.assertEqual(self.redis_client_mock.setex.call_args[0][0], "test_key")
         self.assertEqual(self.redis_client_mock.setex.call_args[0][2], "test text")
         self.assertTrue(result)
 
@@ -71,11 +73,11 @@ class TestRedisMemory(unittest.TestCase):
         self.redis_client_mock.get.return_value = "existing "
         self.redis_client_mock.setex.return_value = True
 
-        result = self.memory.append_text("existing_key", "text")
+        result = self.memory.append_text("text")
 
-        self.redis_client_mock.get.assert_called_once_with("existing_key")
+        self.redis_client_mock.get.assert_called_once_with("test_key")
         self.redis_client_mock.setex.assert_called_once()
-        self.assertEqual(self.redis_client_mock.setex.call_args[0][0], "existing_key")
+        self.assertEqual(self.redis_client_mock.setex.call_args[0][0], "test_key")
         self.assertEqual(self.redis_client_mock.setex.call_args[0][2], "existing text")
         self.assertTrue(result)
 
@@ -84,7 +86,7 @@ class TestRedisMemory(unittest.TestCase):
         # Mock Redis get to raise an exception
         self.redis_client_mock.get.side_effect = Exception("Test exception")
 
-        result = self.memory.append_text("key", "text")
+        result = self.memory.append_text("text")
 
         self.assertFalse(result)
 
@@ -93,9 +95,9 @@ class TestRedisMemory(unittest.TestCase):
         # Mock Redis get to return a value
         self.redis_client_mock.get.return_value = "test value"
 
-        result = self.memory.get_text("key")
+        result = self.memory.get_text()
 
-        self.redis_client_mock.get.assert_called_once_with("key")
+        self.redis_client_mock.get.assert_called_once_with("test_key")
         self.assertEqual(result, "test value")
 
     def test_get_text_nonexistent_key(self):
@@ -103,9 +105,9 @@ class TestRedisMemory(unittest.TestCase):
         # Mock Redis get to return None
         self.redis_client_mock.get.return_value = None
 
-        result = self.memory.get_text("nonexistent_key")
+        result = self.memory.get_text()
 
-        self.redis_client_mock.get.assert_called_once_with("nonexistent_key")
+        self.redis_client_mock.get.assert_called_once_with("test_key")
         self.assertIsNone(result)
 
     def test_get_text_exception(self):
@@ -113,7 +115,7 @@ class TestRedisMemory(unittest.TestCase):
         # Mock Redis get to raise an exception
         self.redis_client_mock.get.side_effect = Exception("Test exception")
 
-        result = self.memory.get_text("key")
+        result = self.memory.get_text()
 
         self.assertIsNone(result)
 
@@ -122,9 +124,9 @@ class TestRedisMemory(unittest.TestCase):
         # Mock Redis delete to return 1 (successful deletion)
         self.redis_client_mock.delete.return_value = 1
 
-        result = self.memory.delete_text("key")
+        result = self.memory.delete_text()
 
-        self.redis_client_mock.delete.assert_called_once_with("key")
+        self.redis_client_mock.delete.assert_called_once_with("test_key")
         self.assertTrue(result)
 
     def test_delete_text_nonexistent_key(self):
@@ -132,9 +134,9 @@ class TestRedisMemory(unittest.TestCase):
         # Mock Redis delete to return 0 (key didn't exist)
         self.redis_client_mock.delete.return_value = 0
 
-        result = self.memory.delete_text("nonexistent_key")
+        result = self.memory.delete_text()
 
-        self.redis_client_mock.delete.assert_called_once_with("nonexistent_key")
+        self.redis_client_mock.delete.assert_called_once_with("test_key")
         self.assertFalse(result)
 
     def test_delete_text_exception(self):
@@ -142,6 +144,6 @@ class TestRedisMemory(unittest.TestCase):
         # Mock Redis delete to raise an exception
         self.redis_client_mock.delete.side_effect = Exception("Test exception")
 
-        result = self.memory.delete_text("key")
+        result = self.memory.delete_text()
 
         self.assertFalse(result)
