@@ -5,6 +5,7 @@ from crewai.llm import LLM
 from tasks.hivemind.classify_question import ClassifyQuestion
 from tasks.hivemind.query_data_sources import RAGPipelineTool
 from tasks.hivemind.answer_validator import AnswerValidator
+from crewai.process import Process
 from pydantic import BaseModel
 from crewai.tools import tool
 
@@ -75,13 +76,12 @@ class AgenticHivemindFlow(Flow[AgenticFlowState]):
         q_a_bot_agent = Agent(
             role="Q&A Bot",
             goal=(
-                "You decide when to rely on your internal knowledge and when to retrieve real-time data. "
-                "For queries that are not specific to community data, answer using your own LLM knowledge. "
+                "You decide when to rely on your internal knowledge and when to retrieve real-time data or chat history. "
+                "For queries that are not specific to community data and not related to chat history, answer using your own LLM knowledge. "
                 "Your final response must not exceed 250 words."
             ),
             backstory=(
-                "You are an intelligent agent capable of giving concise answers to questions using either your internal LLM knowledge "
-                "or a Retrieval-Augmented Generation (RAG) pipeline to fetch community-specific data."
+                "You are an intelligent agent capable of giving concise answers to questions."
             ),
             allow_delegation=True,
             llm=LLM(model="gpt-4o-mini"),
@@ -110,13 +110,8 @@ class AgenticHivemindFlow(Flow[AgenticFlowState]):
                 return f"Chat History: {self.state.chat_history}\n"
 
             history_task = Task(
-                description=(
-                    "Answer the query, "
-                    "If the query relates to past conversations or previous context, analyze the chat history to provide relevant information. "
-                    "If there is no relevant historical context, indicate that no previous context exists.\n\n"
-                    f"Query: {self.state.user_query}"
-                ),
-                expected_output="A clear response that either references relevant chat history or indicates no historical context exists",
+                description="You are an agent that can answer questions about the chat history.",
+                expected_output="A response that incorporates historical context when relevant, or indicates no historical context was needed",
                 agent=q_a_bot_agent,
                 tools=[get_chat_history],
             )
@@ -126,6 +121,8 @@ class AgenticHivemindFlow(Flow[AgenticFlowState]):
         crew = Crew(
             agents=[q_a_bot_agent],
             tasks=[rag_task, history_task] if history_task else [rag_task],
+            process=Process.hierarchical,
+            manager_llm=LLM(model="gpt-4o-mini"),
             verbose=True,
         )
         crew_output = crew.kickoff()
