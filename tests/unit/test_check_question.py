@@ -6,7 +6,7 @@ from tasks.hivemind.classify_question import ClassifyQuestion
 
 class TestClassifyQuestion(unittest.TestCase):
     def setUp(self):
-        self.model = "gpt-4o-mini"
+        self.model = "gpt-4o-mini-2024-07-18"
         self.check_question = ClassifyQuestion(self.model)
 
     @patch("transformers.pipeline")
