@@ -1,13 +1,14 @@
+import logging
 from crewai import Agent, Crew, Task
 from crewai.crews.crew_output import CrewOutput
 from crewai.flow.flow import Flow, listen, start, router
 from crewai.llm import LLM
 from tasks.hivemind.classify_question import ClassifyQuestion
 from tasks.hivemind.query_data_sources import RAGPipelineTool
-from tasks.hivemind.answer_validator import AnswerValidator
 from crewai.process import Process
 from pydantic import BaseModel
 from crewai.tools import tool
+from openai import OpenAI
 
 
 class AgenticFlowState(BaseModel):
@@ -37,6 +38,13 @@ class AgenticHivemindFlow(Flow[AgenticFlowState]):
         super().__init__(persistence, **kwargs)
 
         self.state.user_query = user_query
+
+        if not chat_history:
+            logging.warning(
+                "No chat history provided. "
+                "All answers will be passed either to RAG or LLM's general knowledge!"
+            )
+
         self.state.chat_history = chat_history
 
     @start()
@@ -66,8 +74,21 @@ class AgenticHivemindFlow(Flow[AgenticFlowState]):
     def detect_stop_state(self) -> CrewOutput | None:
         return self.state.last_answer
 
-    @listen("continue")
-    def query(self) -> CrewOutput | str:
+    @router("continue")
+    def detect_question_type(self) -> str:
+        is_history_query = False
+        if self.state.chat_history:
+            is_history_query = self.classify_query(self.state.user_query)
+
+        if is_history_query:
+            logging.info("History query detected")
+            return "history"
+        else:
+            logging.info("RAG query detected")
+            return "rag"
+
+    @router("rag")
+    def do_rag_query(self) -> str:
         query_data_source_tool = RAGPipelineTool.setup_tools(
             community_id=self.community_id,
             enable_answer_skipping=self.enable_answer_skipping,
@@ -76,8 +97,8 @@ class AgenticHivemindFlow(Flow[AgenticFlowState]):
         q_a_bot_agent = Agent(
             role="Q&A Bot",
             goal=(
-                "You decide when to rely on your internal knowledge and when to retrieve real-time data or chat history. "
-                "For queries that are not specific to community data and not related to chat history, answer using your own LLM knowledge. "
+                "You decide when to rely on your internal knowledge and when to retrieve real-time data. "
+                "For queries that are not specific to community data, answer using your own LLM knowledge. "
                 "Your final response must not exceed 250 words."
             ),
             backstory=(
@@ -86,7 +107,6 @@ class AgenticHivemindFlow(Flow[AgenticFlowState]):
             allow_delegation=True,
             llm=LLM(model="gpt-4o-mini"),
         )
-
         rag_task = Task(
             description=(
                 "Answer the following query using a maximum of 250 words. "
@@ -100,90 +120,85 @@ class AgenticHivemindFlow(Flow[AgenticFlowState]):
             ],
         )
 
-        # if chat history was provided
-        # prepare a tool for fetching the chat history
-        if self.state.chat_history:
-
-            @tool
-            def get_chat_history() -> str:
-                "fetch chat history"
-                return f"Chat History: {self.state.chat_history}\n"
-
-            history_task = Task(
-                description="You are an agent that can answer questions about the chat history.",
-                expected_output="A response that incorporates historical context when relevant, or indicates no historical context was needed",
-                agent=q_a_bot_agent,
-                tools=[get_chat_history],
-            )
-        else:
-            history_task = None
-
         crew = Crew(
             agents=[q_a_bot_agent],
-            tasks=[rag_task, history_task] if history_task else [rag_task],
+            tasks=[rag_task],
             process=Process.hierarchical,
             manager_llm=LLM(model="gpt-4o-mini"),
             verbose=True,
         )
+
         crew_output = crew.kickoff()
 
         # Store the latest crew output and increment retry count
         self.state.last_answer = crew_output
         self.state.retry_count += 1
 
-        return crew_output
-
-    @router(query)
-    def check_answer_validity(self, crew_output: CrewOutput) -> str:
         return "stop"
-        # if crew_output.raw == "NONE":
-        #     return "stop"
-        # else:
-        #     checker = AnswerValidator()
-        #     validity = checker.check_answer_validity(
-        #         question=self.state.user_query, answer=crew_output.raw
-        #     )
-        #     if validity is False:
-        #         return "refine"
-        #     else:
-        #         return "stop"
 
-    # @router("refine")
-    # def refine_question(self) -> CrewOutput | None:
-    #     """
-    #     - If the answer is invalid and we've tried fewer than max_retry_count times,
-    #       refine the question and re-query.
-    #     - If the answer is invalid and we've reached or exceeded max_retry_count,
-    #       return the last answer we have.
-    #     """
+    @router("history")
+    def do_history_query(self) -> str:
+        q_a_bot_agent = Agent(
+            role="History bot",
+            goal=(
+                "You are an intelligent agent capable of giving concise answers to questions about chat history."
+            ),
+            backstory=(
+                "You are an intelligent agent capable of giving concise answers to questions."
+            ),
+            llm=LLM(model="gpt-4o-mini"),
+        )
 
-    #     # Check if we've reached the max retry limit
-    #     if self.state.retry_count < self.max_retry_count:
-    #         refine_agent = Agent(
-    #             role="Question Refiner",
-    #             goal="Analyze and refine unclear questions to get better answers",
-    #             backstory=(
-    #                 "You are an expert at understanding and reformulating questions "
-    #                 "to make them more specific and answerable."
-    #             ),
-    #             llm=LLM(model=self.model),
-    #         )
+        @tool
+        def get_chat_history() -> str:
+            "fetch chat history"
+            return f"Chat History: {self.state.chat_history}\n"
 
-    #         refine_task = Task(
-    #             description=(
-    #                 f"The original question '{self.state.user_query}' did not yield a satisfactory answer. "
-    #                 "Please analyze the question and reformulate it to be more specific and clear. "
-    #                 "Consider breaking down complex questions or adding context if needed."
-    #             ),
-    #             expected_output="A refined, more specific version of the original question",
-    #             agent=refine_agent,
-    #         )
+        history_task = Task(
+            description=f"Answer the following query about chat history: {self.state.user_query}",
+            expected_output="A response that incorporates the relevant historical context",
+            agent=q_a_bot_agent,
+            tools=[get_chat_history],
+        )
 
-    #         crew = Crew(agents=[refine_agent], tasks=[refine_task], verbose=True)
+        crew = Crew(
+            agents=[q_a_bot_agent],
+            tasks=[history_task],
+            verbose=True,
+        )
 
-    #         refined_output = crew.kickoff()
+        crew_output = crew.kickoff()
 
-    #         self.state.user_query = refined_output.raw
-    #         return "continue"
-    #     else:
-    #         return "stop"
+        # Store the latest crew output and increment retry count
+        self.state.last_answer = crew_output
+        self.state.retry_count += 1
+
+        return "stop"
+
+    def classify_query(self, query: str) -> bool:
+        """
+        Use LLM to determine if the query is about chat history or past conversations.
+        """
+
+        class Decision(BaseModel):
+            is_history_query: bool
+
+        client = OpenAI()
+
+        system_prompt = (
+            "You are an expert at analyzing user queries to determine "
+            "if they are about chat history or they require inernal/external knowledge."
+        )
+
+        completion = client.beta.chat.completions.parse(
+            model="gpt-4o-mini-2024-07-18",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": query},
+            ],
+            response_format=Decision,
+            temperature=0,
+        )
+
+        decision = completion.choices[0].message.parsed
+        return decision.is_history_query
