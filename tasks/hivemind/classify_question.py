@@ -6,7 +6,7 @@ from transformers import pipeline
 
 
 class ClassifyQuestion:
-    def __init__(self, model: str = "gpt-4o-mini"):
+    def __init__(self, model: str = "gpt-4o-mini-2024-07-18"):
         load_dotenv()
         self.model = model
         self.api_key = os.getenv("OPENAI_API_KEY")

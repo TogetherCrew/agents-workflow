@@ -20,7 +20,7 @@ class AgenticFlowState(BaseModel):
 
 
 class AgenticHivemindFlow(Flow[AgenticFlowState]):
-    model = "gpt-4o"
+    model = "o4-mini-2025-04-16"
 
     def __init__(
         self,
@@ -105,7 +105,7 @@ class AgenticHivemindFlow(Flow[AgenticFlowState]):
                 "You are an intelligent agent capable of giving concise answers to questions."
             ),
             allow_delegation=True,
-            llm=LLM(model="gpt-4o-mini"),
+            llm=LLM(model="gpt-4o-mini-2024-07-18"),
         )
         rag_task = Task(
             description=(
@@ -124,7 +124,7 @@ class AgenticHivemindFlow(Flow[AgenticFlowState]):
             agents=[q_a_bot_agent],
             tasks=[rag_task],
             process=Process.hierarchical,
-            manager_llm=LLM(model="gpt-4o-mini"),
+            manager_llm=LLM(model="gpt-4o-mini-2024-07-18"),
             verbose=True,
         )
 
@@ -146,7 +146,7 @@ class AgenticHivemindFlow(Flow[AgenticFlowState]):
             backstory=(
                 "You are an intelligent agent capable of giving concise answers to questions."
             ),
-            llm=LLM(model="gpt-4o-mini"),
+            llm=LLM(model="gpt-4o-mini-2024-07-18"),
         )
 
         @tool
