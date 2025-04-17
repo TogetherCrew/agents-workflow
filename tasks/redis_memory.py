@@ -24,7 +24,7 @@ class RedisMemory:
         self.redis_port = os.getenv("REDIS_PORT")
         self.redis_password = os.getenv("REDIS_PASSWORD")
 
-        if not self.redis_host or not self.redis_port or not self.redis_password:
+        if not self.redis_host or not self.redis_port or self.redis_password is None:
             raise ValueError(
                 "All REDIS_HOST, REDIS_PORT, and REDIS_PASSWORD must be set"
             )
