@@ -4,13 +4,13 @@ from temporalio import activity, workflow
 
 with workflow.unsafe.imports_passed_through():
     from crewai.crews.crew_output import CrewOutput
-    from tasks.hivemind.agent import AgenticHivemindFlow
+    from tasks.agent_flow import AgenticHivemindFlow
     from tc_temporal_backend.schema.hivemind import HivemindQueryPayload
     from tasks.redis_memory import RedisMemory
 
 
 @activity.defn
-async def run_hivemind_agent_activity(
+async def agent_activity(
     payload: HivemindQueryPayload,
 ) -> str | None:
     """

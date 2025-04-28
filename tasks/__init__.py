@@ -1,1 +1,1 @@
-from tasks.agent import AgenticHivemindTemporalWorkflow, run_hivemind_agent_activity
+from tasks.workflows import AgenticHivemindTemporalWorkflow, agent_activity

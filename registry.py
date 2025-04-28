@@ -1,5 +1,5 @@
-from tasks import AgenticHivemindTemporalWorkflow, run_hivemind_agent_activity
+from tasks import AgenticHivemindTemporalWorkflow, agent_activity
 
 WORKFLOWS = [AgenticHivemindTemporalWorkflow]
 
-ACTIVITIES = [run_hivemind_agent_activity]
+ACTIVITIES = [agent_activity]
