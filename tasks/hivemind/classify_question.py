@@ -1,4 +1,5 @@
 import os
+import re
 
 from openai import OpenAI
 from dotenv import load_dotenv
@@ -6,18 +7,39 @@ from transformers import pipeline
 
 
 class ClassifyQuestion:
-    def __init__(self, model: str = "gpt-4o-mini-2024-07-18"):
+    def __init__(
+            self,
+            model: str = "gpt-4o-mini-2024-07-18",
+            rag_threshold: float = 0.5,
+    ):
         load_dotenv()
         self.model = model
         self.api_key = os.getenv("OPENAI_API_KEY")
+        
+        # Validate rag_threshold is between 0 and 1
+        if not (0 <= rag_threshold <= 1):
+            raise ValueError(f"rag_threshold must be between 0 and 1, got: {rag_threshold}")
+        
         self.classification_model = "shahrukhx01/question-vs-statement-classifier"
-        self.question_check_prompt = """Determine if the user's message requires external knowledge from a RAG pipeline. 
-            If yes, return **True**; otherwise, return **False**. However, if the user's request 
-            is specifically directed to a person (even if no name is mentioned, e.g., “Could you 
-            do this for me?”), always return **False**. Provide only “True” or “False,” with no 
-            further explanation.
-            
-            Message: """
+        self.system_prompt = ("""You are a classification assistant. For any incoming user message, assign a sensitivity score between 0 and 1 reflecting how much it requires fetching up-to-date or specialized information from an external retrieval-augmented generation (RAG) data source."""
+                                      """\n\nScoring guidelines:\n"""
+                                      """- 1.0: definitely requires RAG (specific, dynamic, or domain-specific queries).\n"""
+                                      """- 0.0: definitely does not (greetings, opinions, casual chat, or requests directed at a person).\n"""
+                                      """- Intermediate values (e.g., 0.3, 0.7) indicate partial or borderline cases.\n"""
+                                      """Apply these rules:\n"""
+                                      """1. If the message asks for up-to-date or time-sensitive facts (e.g., "latest," "current price," "when X"), lean toward 1.0.\n"""
+                                      """2. If it seeks definitions or explanations of specialized or domain-specific concepts, lean toward 1.0.\n"""
+                                      """3. If it requests step-by-step procedures or how-to guides, lean toward 1.0.\n"""
+                                      """4. If it needs project-, platform-, or asset-specific information (e.g., campaign status, token listings), lean toward 1.0.\n"""
+                                      """5. If it asks for recommendations, comparisons, or "best" choices, lean toward 1.0.\n"""
+                                      """6. If it involves legitimacy, validation, or security verification, lean toward 1.0.\n"""
+                                      """7. If it references external identifiers, tickers, tokens, URLs, or passwords, lean toward 0.0.\n"""
+                                      """8. If the answer cannot be derived from prior conversation context alone, lean toward 1.0.\n"""
+                                      """9. If it's a greeting, opinion, speculation, brainstorming, or casual chat addressed to a person, lean toward 0.0.\n"""
+                                      """10. For ambiguous or borderline cases, choose an appropriate fractional score between 0 and 1.\n"""
+                                      """\nRespond with exactly one decimal number between 0 and 1 (e.g., `0`, `0.5`, `1`). No extra text."""
+        )
+        self.rag_threshold = rag_threshold
 
     def classify_message(self, message: str) -> bool:
         """
@@ -38,21 +60,29 @@ class ClassifyQuestion:
         Classify message using a language model
         """
         client = OpenAI()
-        prompt = self.question_check_prompt + message
+        user_prompt = (
+            """Assign a sensitivity score (0-1) to the following message according to the system rules. Reply with only the number."""
+            f"""\n\nMessage: "{message}"""
+        )
 
         response = client.chat.completions.create(
             model=self.model,
             messages=[
-                {"role": "system", "content": "You are a helpful assistant."},
-                {"role": "user", "content": prompt},
+                {"role": "system", "content": self.system_prompt},
+                {"role": "user", "content": user_prompt},
             ],
         )
 
         response_text = response.choices[0].message.content.strip().lower()
 
-        if "true" in response_text:
-            return True
-        elif "false" in response_text:
-            return False
+        # Match any decimal number format (including negative and > 1)
+        if re.match(r"^-?\d*\.?\d+$", response_text):
+            score = float(response_text)
+            
+            # Validate score is between 0 and 1
+            if not (0 <= score <= 1):
+                raise ValueError(f"Generated score must be between 0 and 1, got: {score}")
+            
+            return score >= self.rag_threshold
         else:
             raise ValueError(f"Wrong response: {response_text}")
