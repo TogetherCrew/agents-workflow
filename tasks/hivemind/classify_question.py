@@ -15,6 +15,11 @@ class ClassifyQuestion:
         load_dotenv()
         self.model = model
         self.api_key = os.getenv("OPENAI_API_KEY")
+        
+        # Validate rag_threshold is between 0 and 1
+        if not (0 <= rag_threshold <= 1):
+            raise ValueError(f"rag_threshold must be between 0 and 1, got: {rag_threshold}")
+        
         self.classification_model = "shahrukhx01/question-vs-statement-classifier"
         self.system_prompt = ("""You are a classification assistant. For any incoming user message, assign a sensitivity score between 0 and 1 reflecting how much it requires fetching up-to-date or specialized information from an external retrieval-augmented generation (RAG) data source."""
                                       """\n\nScoring guidelines:\n"""
@@ -22,11 +27,11 @@ class ClassifyQuestion:
                                       """- 0.0: definitely does not (greetings, opinions, casual chat, or requests directed at a person).\n"""
                                       """- Intermediate values (e.g., 0.3, 0.7) indicate partial or borderline cases.\n"""
                                       """Apply these rules:\n"""
-                                      """1. If the message asks for up-to-date or time-sensitive facts (e.g., “latest,” “current price,” “when X”), lean toward 1.0.\n"""
+                                      """1. If the message asks for up-to-date or time-sensitive facts (e.g., "latest," "current price," "when X"), lean toward 1.0.\n"""
                                       """2. If it seeks definitions or explanations of specialized or domain-specific concepts, lean toward 1.0.\n"""
                                       """3. If it requests step-by-step procedures or how-to guides, lean toward 1.0.\n"""
                                       """4. If it needs project-, platform-, or asset-specific information (e.g., campaign status, token listings), lean toward 1.0.\n"""
-                                      """5. If it asks for recommendations, comparisons, or “best” choices, lean toward 1.0.\n"""
+                                      """5. If it asks for recommendations, comparisons, or "best" choices, lean toward 1.0.\n"""
                                       """6. If it involves legitimacy, validation, or security verification, lean toward 1.0.\n"""
                                       """7. If it references external identifiers, tickers, tokens, URLs, or passwords, lean toward 0.0.\n"""
                                       """8. If the answer cannot be derived from prior conversation context alone, lean toward 1.0.\n"""
@@ -70,7 +75,14 @@ class ClassifyQuestion:
 
         response_text = response.choices[0].message.content.strip().lower()
 
-        if re.match(r"^(?:0|1|\d+\.\d+)$", response_text):
-            return float(response_text) >= self.rag_threshold
+        # Match any decimal number format (including negative and > 1)
+        if re.match(r"^-?\d*\.?\d+$", response_text):
+            score = float(response_text)
+            
+            # Validate score is between 0 and 1
+            if not (0 <= score <= 1):
+                raise ValueError(f"Generated score must be between 0 and 1, got: {score}")
+            
+            return score >= self.rag_threshold
         else:
             raise ValueError(f"Wrong response: {response_text}")

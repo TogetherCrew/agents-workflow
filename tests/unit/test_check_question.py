@@ -10,6 +10,25 @@ class TestClassifyQuestion(unittest.TestCase):
         self.rag_threshold = 0.5
         self.check_question = ClassifyQuestion(self.model, self.rag_threshold)
 
+    def test_init_valid_threshold(self):
+        # Test that valid thresholds work
+        valid_thresholds = [0, 0.25, 0.5, 0.75, 1.0]
+        for threshold in valid_thresholds:
+            question_classifier = ClassifyQuestion(self.model, threshold)
+            self.assertEqual(question_classifier.rag_threshold, threshold)
+
+    def test_init_invalid_threshold_too_low(self):
+        # Test that threshold below 0 raises ValueError
+        with self.assertRaises(ValueError) as context:
+            ClassifyQuestion(self.model, -0.1)
+        self.assertIn("rag_threshold must be between 0 and 1", str(context.exception))
+
+    def test_init_invalid_threshold_too_high(self):
+        # Test that threshold above 1 raises ValueError
+        with self.assertRaises(ValueError) as context:
+            ClassifyQuestion(self.model, 1.5)
+        self.assertIn("rag_threshold must be between 0 and 1", str(context.exception))
+
     @patch("transformers.pipeline")
     def test_classify_message_statement(self, mock_pipeline):
         # Test that a statement is correctly classified as False
@@ -106,6 +125,24 @@ class TestClassifyQuestion(unittest.TestCase):
         self.assertTrue(result)
 
     @patch("tasks.hivemind.classify_question.OpenAI")
+    def test_classify_message_lm_score_below_zero(self, mock_openai):
+        # Test that classify_message_lm raises ValueError for scores below 0
+
+        mock_response = Mock()
+        mock_choice = Mock()
+        mock_message = Mock()
+
+        mock_message.content = "-0.1"
+        mock_choice.message = mock_message
+        mock_response.choices = [mock_choice]
+
+        mock_openai.return_value.chat.completions.create.return_value = mock_response
+
+        with self.assertRaises(ValueError) as context:
+            self.check_question.classify_message_lm("Could you help me with this?")
+        self.assertIn("Generated score must be between 0 and 1", str(context.exception))
+
+    @patch("tasks.hivemind.classify_question.OpenAI")
     def test_classify_message_lm_invalid_response(self, mock_openai):
         # Test that classify_message_lm raises ValueError for an invalid response from OpenAI API
 
@@ -124,21 +161,22 @@ class TestClassifyQuestion(unittest.TestCase):
 
     @patch("tasks.hivemind.classify_question.OpenAI")
     def test_classify_message_lm_out_of_range_response(self, mock_openai):
-        # Test that classify_message_lm works correctly with values outside 0-1 range (current implementation allows this)
+        # Test that classify_message_lm raises ValueError for values outside 0-1 range
 
         mock_response = Mock()
         mock_choice = Mock()
         mock_message = Mock()
 
-        # Test with value greater than 1 - should not raise error but return True since 1.5 >= 0.5
+        # Test with value greater than 1 - should raise ValueError due to score validation
         mock_message.content = "1.5"
         mock_choice.message = mock_message
         mock_response.choices = [mock_choice]
 
         mock_openai.return_value.chat.completions.create.return_value = mock_response
 
-        result = self.check_question.classify_message_lm("Could you help me with this?")
-        self.assertTrue(result)  # 1.5 >= 0.5 threshold
+        with self.assertRaises(ValueError) as context:
+            self.check_question.classify_message_lm("Could you help me with this?")
+        self.assertIn("Generated score must be between 0 and 1", str(context.exception))
 
     @patch("tasks.hivemind.classify_question.OpenAI")
     def test_classify_message_lm_invalid_decimal_format(self, mock_openai):
@@ -159,7 +197,7 @@ class TestClassifyQuestion(unittest.TestCase):
 
     @patch("tasks.hivemind.classify_question.OpenAI")
     def test_classify_message_lm_negative_response(self, mock_openai):
-        # Test that classify_message_lm raises ValueError for negative responses (regex doesn't match negative numbers)
+        # Test that classify_message_lm raises ValueError for negative responses
 
         mock_response = Mock()
         mock_choice = Mock()
@@ -171,5 +209,6 @@ class TestClassifyQuestion(unittest.TestCase):
 
         mock_openai.return_value.chat.completions.create.return_value = mock_response
 
-        with self.assertRaises(ValueError):
+        with self.assertRaises(ValueError) as context:
             self.check_question.classify_message_lm("Could you help me with this?")
+        self.assertIn("Generated score must be between 0 and 1", str(context.exception))
