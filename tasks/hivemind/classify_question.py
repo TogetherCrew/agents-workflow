@@ -16,7 +16,7 @@ class ClassifyQuestion:
         self.model = model
         self.api_key = os.getenv("OPENAI_API_KEY")
         self.classification_model = "shahrukhx01/question-vs-statement-classifier"
-        self.system_prompt = ("""You are a classification assistant. For any incoming user message, assign a sensitivity score between 0 and 1 reflecting how much it requires fetching up-to-date or specialized information from an external retrieval-augmented generation (RAG) data source and provide a reasoning for your score."""
+        self.system_prompt = ("""You are a classification assistant. For any incoming user message, assign a sensitivity score between 0 and 1 reflecting how much it requires fetching up-to-date or specialized information from an external retrieval-augmented generation (RAG) data source."""
                                       """\n\nScoring guidelines:\n"""
                                       """- 1.0: definitely requires RAG (specific, dynamic, or domain-specific queries).\n"""
                                       """- 0.0: definitely does not (greetings, opinions, casual chat, or requests directed at a person).\n"""
