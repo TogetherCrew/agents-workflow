@@ -54,10 +54,30 @@ class ClassifyQuestion:
         out = pipe(message)
         is_question = custom_labels.get(out[0]["label"])
         return is_question
+    
+    def classify_question_lm(self, message: str) -> bool:
+        """
+        Classify message using a language model to be a question or not
+        """
+        client = OpenAI()
+        user_prompt = (
+            "Classify the following user message to be a question or not. Reply with only a boolean value."
+            f"\n\nMessage: {message}"
+        )
+        response = client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": "You are a classification assistant that is very good at classifying messages to be a question or not."},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0.0,
+        )
+        response_text = response.choices[0].message.content.strip().lower()
+        return response_text == "true"
 
     def classify_message_lm(self, message: str) -> bool:
         """
-        Classify message using a language model
+        Classify message using a language model to be a RAG question or not
         """
         client = OpenAI()
         user_prompt = (
@@ -71,6 +91,7 @@ class ClassifyQuestion:
                 {"role": "system", "content": self.system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
+            temperature=0.0,
         )
 
         response_text = response.choices[0].message.content.strip().lower()
