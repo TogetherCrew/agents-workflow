@@ -73,7 +73,14 @@ class ClassifyQuestion:
             temperature=0.0,
         )
         response_text = response.choices[0].message.content.strip().lower()
-        return response_text == "true"
+        
+        # Validate the response and handle expected boolean values
+        if response_text in ["true", "yes", "1"]:
+            return True
+        elif response_text in ["false", "no", "0"]:
+            return False
+        else:
+            raise ValueError(f"Unexpected boolean response from model: '{response_text}'. Expected 'true' or 'false'.")
 
     def classify_message_lm(self, message: str) -> bool:
         """
