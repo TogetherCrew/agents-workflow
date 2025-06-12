@@ -54,7 +54,6 @@ class ClassifyQuestion:
                                       """8. If the answer cannot be derived from prior conversation context alone, lean toward 1.0.\n"""
                                       """9. If it's a greeting, opinion, speculation, brainstorming, or casual chat addressed to a person, lean toward 0.0.\n"""
                                       """10. For ambiguous or borderline cases, choose an appropriate fractional score between 0 and 1.\n"""
-                                      """\nRespond with exactly one decimal number between 0 and 1 (e.g., `0`, `0.5`, `1`). No extra text."""
         )
         self.rag_threshold = rag_threshold
 
@@ -79,20 +78,51 @@ class ClassifyQuestion:
         """
         client = OpenAI()
         
+        user_prompt = (
+            f"Classify the following user message to determine if it is a question or not.\n\nMessage: {message}"
+        )
+        
+        # Define the response schema based on reasoning setting
         if self.enable_reasoning:
-            user_prompt = (
-                "Classify the following user message to be a question or not. "
-                "First provide your reasoning, then give the result. "
-                "Format your response as:\n"
-                "Reasoning: [your detailed reasoning here]\n"
-                "Result: [true or false]"
-                f"\n\nMessage: {message}"
-            )
+            response_format = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "question_classification_with_reasoning",
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "result": {
+                                "type": "boolean",
+                                "description": "Whether the message is a question (true) or not (false)"
+                            },
+                            "reasoning": {
+                                "type": "string",
+                                "description": "Explanation for the classification decision"
+                            }
+                        },
+                        "required": ["result", "reasoning"],
+                        "additionalProperties": False
+                    }
+                }
+            }
         else:
-            user_prompt = (
-                "Classify the following user message to be a question or not. Reply with only a boolean value."
-                f"\n\nMessage: {message}"
-            )
+            response_format = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "question_classification",
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "result": {
+                                "type": "boolean",
+                                "description": "Whether the message is a question (true) or not (false)"
+                            }
+                        },
+                        "required": ["result"],
+                        "additionalProperties": False
+                    }
+                }
+            }
         
         # Prepare chat completion parameters
         completion_params = {
@@ -102,47 +132,18 @@ class ClassifyQuestion:
                 {"role": "user", "content": user_prompt},
             ],
             "temperature": 0.0,
+            "response_format": response_format
         }
         
         response = client.chat.completions.create(**completion_params)
         response_text = response.choices[0].message.content.strip()
         
-        # Parse response based on whether reasoning is enabled
-        reasoning = None
-        if self.enable_reasoning and "Reasoning:" in response_text and "Result:" in response_text:
-            # Parse structured response
-            try:
-                parts = response_text.split("Result:")
-                reasoning_part = parts[0].replace("Reasoning:", "").strip()
-                result_part = parts[1].strip().lower()
-                
-                # Validate the result part
-                if result_part in ["true", "yes", "1"]:
-                    result = True
-                elif result_part in ["false", "no", "0"]:
-                    result = False
-                else:
-                    raise ValueError(f"Unexpected boolean response: '{result_part}'")
-                
-                reasoning = reasoning_part
-            except (IndexError, ValueError):
-                # Fallback to simple parsing if structured parsing fails
-                response_lower = response_text.lower()
-                if "true" in response_lower or "yes" in response_lower:
-                    result = True
-                elif "false" in response_lower or "no" in response_lower:
-                    result = False
-                else:
-                    raise ValueError(f"Could not parse response: '{response_text}'")
-        else:
-            # Handle simple boolean response
-            response_lower = response_text.lower()
-            if response_lower in ["true", "yes", "1"]:
-                result = True
-            elif response_lower in ["false", "no", "0"]:
-                result = False
-            else:
-                raise ValueError(f"Unexpected boolean response from model: '{response_text}'. Expected 'true' or 'false'.")
+        # Parse the structured JSON response
+        import json
+        response_data = json.loads(response_text)
+        
+        result = bool(response_data["result"])
+        reasoning = response_data.get("reasoning") if self.enable_reasoning else None
         
         # Prepare return data
         result_data = {"result": result}
@@ -157,21 +158,56 @@ class ClassifyQuestion:
         Returns a MessageClassificationResult with result, score, and optionally reasoning
         """
         client = OpenAI()
+        
+        user_prompt = (
+            f"""Assign a sensitivity score (0-1) to the following message according to the system rules.\n\nMessage: "{message}"""
+        )
 
+        # Define the response schema based on reasoning setting
         if self.enable_reasoning:
-            user_prompt = (
-                """Assign a sensitivity score (0-1) to the following message according to the system rules. """
-                """First provide your reasoning for the score, then give the numerical score. """
-                """Format your response as:\n"""
-                """Reasoning: [your detailed reasoning here]\n"""
-                """Score: [numerical score between 0 and 1]"""
-                f"""\n\nMessage: "{message}"""
-            )
+            response_format = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "rag_classification_with_reasoning",
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "score": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 1,
+                                "description": "Sensitivity score between 0 and 1"
+                            },
+                            "reasoning": {
+                                "type": "string",
+                                "description": "Explanation for the assigned score"
+                            }
+                        },
+                        "required": ["score", "reasoning"],
+                        "additionalProperties": False
+                    }
+                }
+            }
         else:
-            user_prompt = (
-                """Assign a sensitivity score (0-1) to the following message according to the system rules. Reply with only the number."""
-                f"""\n\nMessage: "{message}"""
-            )
+            response_format = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "rag_classification",
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "score": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 1,
+                                "description": "Sensitivity score between 0 and 1"
+                            }
+                        },
+                        "required": ["score"],
+                        "additionalProperties": False
+                    }
+                }
+            }
 
         # Prepare chat completion parameters
         completion_params = {
@@ -181,58 +217,24 @@ class ClassifyQuestion:
                 {"role": "user", "content": user_prompt},
             ],
             "temperature": 0.0,
+            "response_format": response_format
         }
 
         response = client.chat.completions.create(**completion_params)
         response_text = response.choices[0].message.content.strip()
 
-        # Parse response based on whether reasoning is enabled
-        reasoning = None
-        if self.enable_reasoning and "Reasoning:" in response_text and "Score:" in response_text:
-            # Parse structured response
-            try:
-                parts = response_text.split("Score:")
-                reasoning_part = parts[0].replace("Reasoning:", "").strip()
-                score_part = parts[1].strip()
-                
-                # Match any decimal number format
-                if re.match(r"^-?\d*\.?\d+$", score_part):
-                    score = float(score_part)
-                    
-                    # Validate score is between 0 and 1
-                    if not (0 <= score <= 1):
-                        raise ValueError(f"Generated score must be between 0 and 1, got: {score}")
-                    
-                    result = score >= self.rag_threshold
-                else:
-                    raise ValueError(f"Invalid score format: {score_part}")
-                
-                reasoning = reasoning_part
-            except (IndexError, ValueError) as e:
-                # Fallback to simple parsing if structured parsing fails
-                response_lower = response_text.lower()
-                if re.match(r"^-?\d*\.?\d+$", response_lower):
-                    score = float(response_lower)
-                    if not (0 <= score <= 1):
-                        raise ValueError(f"Generated score must be between 0 and 1, got: {score}")
-                    result = score >= self.rag_threshold
-                else:
-                    raise ValueError(f"Could not parse response: '{response_text}'")
-        else:
-            # Handle simple score response
-            response_lower = response_text.lower()
-            
-            # Match any decimal number format (including negative and > 1)
-            if re.match(r"^-?\d*\.?\d+$", response_lower):
-                score = float(response_lower)
-                
-                # Validate score is between 0 and 1
-                if not (0 <= score <= 1):
-                    raise ValueError(f"Generated score must be between 0 and 1, got: {score}")
-                
-                result = score >= self.rag_threshold
-            else:
-                raise ValueError(f"Wrong response: {response_text}")
+        # Parse the structured JSON response
+        import json
+        response_data = json.loads(response_text)
+        
+        score = float(response_data["score"])
+        
+        # Validate score is between 0 and 1 (should be enforced by schema, but double-check)
+        if not (0 <= score <= 1):
+            raise ValueError(f"Generated score must be between 0 and 1, got: {score}")
+        
+        result = score >= self.rag_threshold
+        reasoning = response_data.get("reasoning") if self.enable_reasoning else None
         
         # Prepare return data
         result_data = {"result": result, "score": score}
