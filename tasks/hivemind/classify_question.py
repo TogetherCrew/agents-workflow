@@ -1,5 +1,3 @@
-import os
-import re
 from typing import Optional
 
 from openai import OpenAI
@@ -30,7 +28,6 @@ class ClassifyQuestion:
     ):
         load_dotenv()
         self.model = model
-        self.api_key = os.getenv("OPENAI_API_KEY")
         self.enable_reasoning = enable_reasoning
         
         # Validate rag_threshold is between 0 and 1
