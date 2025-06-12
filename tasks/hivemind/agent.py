@@ -53,7 +53,7 @@ class AgenticHivemindFlow(Flow[AgenticFlowState]):
             self.state.state = "continue"
             return
         
-        checker = ClassifyQuestion()
+        checker = ClassifyQuestion(enable_reasoning=True)
 
         # classify using a local model
         question = checker.classify_message(message=self.state.user_query)
@@ -63,13 +63,13 @@ class AgenticHivemindFlow(Flow[AgenticFlowState]):
 
         # classify using a language model
         is_question = checker.classify_question_lm(message=self.state.user_query)
-        if not is_question:
+        if not is_question.result:
             self.state.state = "stop"
             return
 
         # classify if its a RAG question
         rag_question = checker.classify_message_lm(message=self.state.user_query)
-        self.state.state = "continue" if rag_question else "stop"
+        self.state.state = "continue" if rag_question.result else "stop"
 
     @router(detect_question)
     def route_start(self) -> str:

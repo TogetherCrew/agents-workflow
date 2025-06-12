@@ -1,9 +1,24 @@
 import os
 import re
+from typing import Optional
 
 from openai import OpenAI
 from dotenv import load_dotenv
 from transformers import pipeline
+from pydantic import BaseModel
+
+
+class QuestionClassificationResult(BaseModel):
+    """Result of question classification"""
+    result: bool
+    reasoning: Optional[str] = None
+
+
+class MessageClassificationResult(BaseModel):
+    """Result of message classification for RAG"""
+    result: bool
+    score: float
+    reasoning: Optional[str] = None
 
 
 class ClassifyQuestion:
@@ -11,10 +26,12 @@ class ClassifyQuestion:
             self,
             model: str = "gpt-4o-mini-2024-07-18",
             rag_threshold: float = 0.5,
+            enable_reasoning: bool = False,
     ):
         load_dotenv()
         self.model = model
         self.api_key = os.getenv("OPENAI_API_KEY")
+        self.enable_reasoning = enable_reasoning
         
         # Validate rag_threshold is between 0 and 1
         if not (0 <= rag_threshold <= 1):
@@ -55,62 +72,171 @@ class ClassifyQuestion:
         is_question = custom_labels.get(out[0]["label"])
         return is_question
     
-    def classify_question_lm(self, message: str) -> bool:
+    def classify_question_lm(self, message: str) -> QuestionClassificationResult:
         """
         Classify message using a language model to be a question or not
+        Returns a QuestionClassificationResult with result and optionally reasoning
         """
         client = OpenAI()
-        user_prompt = (
-            "Classify the following user message to be a question or not. Reply with only a boolean value."
-            f"\n\nMessage: {message}"
-        )
-        response = client.chat.completions.create(
-            model=self.model,
-            messages=[
+        
+        if self.enable_reasoning:
+            user_prompt = (
+                "Classify the following user message to be a question or not. "
+                "First provide your reasoning, then give the result. "
+                "Format your response as:\n"
+                "Reasoning: [your detailed reasoning here]\n"
+                "Result: [true or false]"
+                f"\n\nMessage: {message}"
+            )
+        else:
+            user_prompt = (
+                "Classify the following user message to be a question or not. Reply with only a boolean value."
+                f"\n\nMessage: {message}"
+            )
+        
+        # Prepare chat completion parameters
+        completion_params = {
+            "model": self.model,
+            "messages": [
                 {"role": "system", "content": "You are a classification assistant that is very good at classifying messages to be a question or not."},
                 {"role": "user", "content": user_prompt},
             ],
-            temperature=0.0,
-        )
-        response_text = response.choices[0].message.content.strip().lower()
+            "temperature": 0.0,
+        }
         
-        # Validate the response and handle expected boolean values
-        if response_text in ["true", "yes", "1"]:
-            return True
-        elif response_text in ["false", "no", "0"]:
-            return False
+        response = client.chat.completions.create(**completion_params)
+        response_text = response.choices[0].message.content.strip()
+        
+        # Parse response based on whether reasoning is enabled
+        reasoning = None
+        if self.enable_reasoning and "Reasoning:" in response_text and "Result:" in response_text:
+            # Parse structured response
+            try:
+                parts = response_text.split("Result:")
+                reasoning_part = parts[0].replace("Reasoning:", "").strip()
+                result_part = parts[1].strip().lower()
+                
+                # Validate the result part
+                if result_part in ["true", "yes", "1"]:
+                    result = True
+                elif result_part in ["false", "no", "0"]:
+                    result = False
+                else:
+                    raise ValueError(f"Unexpected boolean response: '{result_part}'")
+                
+                reasoning = reasoning_part
+            except (IndexError, ValueError):
+                # Fallback to simple parsing if structured parsing fails
+                response_lower = response_text.lower()
+                if "true" in response_lower or "yes" in response_lower:
+                    result = True
+                elif "false" in response_lower or "no" in response_lower:
+                    result = False
+                else:
+                    raise ValueError(f"Could not parse response: '{response_text}'")
         else:
-            raise ValueError(f"Unexpected boolean response from model: '{response_text}'. Expected 'true' or 'false'.")
+            # Handle simple boolean response
+            response_lower = response_text.lower()
+            if response_lower in ["true", "yes", "1"]:
+                result = True
+            elif response_lower in ["false", "no", "0"]:
+                result = False
+            else:
+                raise ValueError(f"Unexpected boolean response from model: '{response_text}'. Expected 'true' or 'false'.")
+        
+        # Prepare return data
+        result_data = {"result": result}
+        if reasoning:
+            result_data["reasoning"] = reasoning
+        
+        return QuestionClassificationResult(**result_data)
 
-    def classify_message_lm(self, message: str) -> bool:
+    def classify_message_lm(self, message: str) -> MessageClassificationResult:
         """
         Classify message using a language model to be a RAG question or not
+        Returns a MessageClassificationResult with result, score, and optionally reasoning
         """
         client = OpenAI()
-        user_prompt = (
-            """Assign a sensitivity score (0-1) to the following message according to the system rules. Reply with only the number."""
-            f"""\n\nMessage: "{message}"""
-        )
 
-        response = client.chat.completions.create(
-            model=self.model,
-            messages=[
+        if self.enable_reasoning:
+            user_prompt = (
+                """Assign a sensitivity score (0-1) to the following message according to the system rules. """
+                """First provide your reasoning for the score, then give the numerical score. """
+                """Format your response as:\n"""
+                """Reasoning: [your detailed reasoning here]\n"""
+                """Score: [numerical score between 0 and 1]"""
+                f"""\n\nMessage: "{message}"""
+            )
+        else:
+            user_prompt = (
+                """Assign a sensitivity score (0-1) to the following message according to the system rules. Reply with only the number."""
+                f"""\n\nMessage: "{message}"""
+            )
+
+        # Prepare chat completion parameters
+        completion_params = {
+            "model": self.model,
+            "messages": [
                 {"role": "system", "content": self.system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
-            temperature=0.0,
-        )
+            "temperature": 0.0,
+        }
 
-        response_text = response.choices[0].message.content.strip().lower()
+        response = client.chat.completions.create(**completion_params)
+        response_text = response.choices[0].message.content.strip()
 
-        # Match any decimal number format (including negative and > 1)
-        if re.match(r"^-?\d*\.?\d+$", response_text):
-            score = float(response_text)
-            
-            # Validate score is between 0 and 1
-            if not (0 <= score <= 1):
-                raise ValueError(f"Generated score must be between 0 and 1, got: {score}")
-            
-            return score >= self.rag_threshold
+        # Parse response based on whether reasoning is enabled
+        reasoning = None
+        if self.enable_reasoning and "Reasoning:" in response_text and "Score:" in response_text:
+            # Parse structured response
+            try:
+                parts = response_text.split("Score:")
+                reasoning_part = parts[0].replace("Reasoning:", "").strip()
+                score_part = parts[1].strip()
+                
+                # Match any decimal number format
+                if re.match(r"^-?\d*\.?\d+$", score_part):
+                    score = float(score_part)
+                    
+                    # Validate score is between 0 and 1
+                    if not (0 <= score <= 1):
+                        raise ValueError(f"Generated score must be between 0 and 1, got: {score}")
+                    
+                    result = score >= self.rag_threshold
+                else:
+                    raise ValueError(f"Invalid score format: {score_part}")
+                
+                reasoning = reasoning_part
+            except (IndexError, ValueError) as e:
+                # Fallback to simple parsing if structured parsing fails
+                response_lower = response_text.lower()
+                if re.match(r"^-?\d*\.?\d+$", response_lower):
+                    score = float(response_lower)
+                    if not (0 <= score <= 1):
+                        raise ValueError(f"Generated score must be between 0 and 1, got: {score}")
+                    result = score >= self.rag_threshold
+                else:
+                    raise ValueError(f"Could not parse response: '{response_text}'")
         else:
-            raise ValueError(f"Wrong response: {response_text}")
+            # Handle simple score response
+            response_lower = response_text.lower()
+            
+            # Match any decimal number format (including negative and > 1)
+            if re.match(r"^-?\d*\.?\d+$", response_lower):
+                score = float(response_lower)
+                
+                # Validate score is between 0 and 1
+                if not (0 <= score <= 1):
+                    raise ValueError(f"Generated score must be between 0 and 1, got: {score}")
+                
+                result = score >= self.rag_threshold
+            else:
+                raise ValueError(f"Wrong response: {response_text}")
+        
+        # Prepare return data
+        result_data = {"result": result, "score": score}
+        if reasoning:
+            result_data["reasoning"] = reasoning
+        
+        return MessageClassificationResult(**result_data)
