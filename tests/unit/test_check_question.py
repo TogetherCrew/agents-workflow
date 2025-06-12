@@ -1,7 +1,8 @@
 import unittest
 from unittest.mock import patch, Mock
+import json
 
-from tasks.hivemind.classify_question import ClassifyQuestion
+from tasks.hivemind.classify_question import ClassifyQuestion, QuestionClassificationResult, MessageClassificationResult
 
 
 class TestClassifyQuestion(unittest.TestCase):
@@ -9,6 +10,7 @@ class TestClassifyQuestion(unittest.TestCase):
         self.model = "gpt-4o-mini-2024-07-18"
         self.rag_threshold = 0.5
         self.check_question = ClassifyQuestion(self.model, self.rag_threshold)
+        self.check_question_with_reasoning = ClassifyQuestion(self.model, self.rag_threshold, enable_reasoning=True)
 
     def test_init_valid_threshold(self):
         # Test that valid thresholds work
@@ -28,6 +30,14 @@ class TestClassifyQuestion(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             ClassifyQuestion(self.model, 1.5)
         self.assertIn("rag_threshold must be between 0 and 1", str(context.exception))
+
+    def test_init_with_reasoning(self):
+        # Test that enable_reasoning parameter works
+        classifier = ClassifyQuestion(self.model, self.rag_threshold, enable_reasoning=True)
+        self.assertTrue(classifier.enable_reasoning)
+        
+        classifier = ClassifyQuestion(self.model, self.rag_threshold, enable_reasoning=False)
+        self.assertFalse(classifier.enable_reasoning)
 
     @patch("transformers.pipeline")
     def test_classify_message_statement(self, mock_pipeline):
@@ -50,6 +60,83 @@ class TestClassifyQuestion(unittest.TestCase):
         self.assertTrue(result)
 
     @patch("tasks.hivemind.classify_question.OpenAI")
+    def test_classify_question_lm_true_response(self, mock_openai):
+        # Test that classify_question_lm returns True for positive responses
+
+        mock_response = Mock()
+        mock_choice = Mock()
+        mock_message = Mock()
+
+        mock_message.content = json.dumps({"result": True})
+        mock_choice.message = mock_message
+        mock_response.choices = [mock_choice]
+
+        mock_openai.return_value.chat.completions.create.return_value = mock_response
+
+        result = self.check_question.classify_question_lm("What is the weather?")
+        self.assertIsInstance(result, QuestionClassificationResult)
+        self.assertTrue(result.result)
+        self.assertIsNone(result.reasoning)
+
+    @patch("tasks.hivemind.classify_question.OpenAI")
+    def test_classify_question_lm_false_response(self, mock_openai):
+        # Test that classify_question_lm returns False for negative responses
+
+        mock_response = Mock()
+        mock_choice = Mock()
+        mock_message = Mock()
+
+        mock_message.content = json.dumps({"result": False})
+        mock_choice.message = mock_message
+        mock_response.choices = [mock_choice]
+
+        mock_openai.return_value.chat.completions.create.return_value = mock_response
+
+        result = self.check_question.classify_question_lm("Hello there!")
+        self.assertIsInstance(result, QuestionClassificationResult)
+        self.assertFalse(result.result)
+        self.assertIsNone(result.reasoning)
+
+    @patch("tasks.hivemind.classify_question.OpenAI")
+    def test_classify_question_lm_with_reasoning(self, mock_openai):
+        # Test classify_question_lm with reasoning enabled
+
+        mock_response = Mock()
+        mock_choice = Mock()
+        mock_message = Mock()
+
+        mock_message.content = json.dumps({
+            "result": True,
+            "reasoning": "This is clearly asking for information about weather conditions."
+        })
+        mock_choice.message = mock_message
+        mock_response.choices = [mock_choice]
+
+        mock_openai.return_value.chat.completions.create.return_value = mock_response
+
+        result = self.check_question_with_reasoning.classify_question_lm("What is the weather?")
+        self.assertIsInstance(result, QuestionClassificationResult)
+        self.assertTrue(result.result)
+        self.assertEqual(result.reasoning, "This is clearly asking for information about weather conditions.")
+
+    @patch("tasks.hivemind.classify_question.OpenAI")
+    def test_classify_question_lm_invalid_json_response(self, mock_openai):
+        # Test that classify_question_lm raises JSONDecodeError for invalid JSON
+
+        mock_response = Mock()
+        mock_choice = Mock()
+        mock_message = Mock()
+
+        mock_message.content = "invalid_json"
+        mock_choice.message = mock_message
+        mock_response.choices = [mock_choice]
+
+        mock_openai.return_value.chat.completions.create.return_value = mock_response
+
+        with self.assertRaises(json.JSONDecodeError):
+            self.check_question.classify_question_lm("Is this valid?")
+
+    @patch("tasks.hivemind.classify_question.OpenAI")
     def test_classify_message_lm_high_score(self, mock_openai):
         # Test that the classify_message_lm method returns True for a score above threshold
 
@@ -57,7 +144,7 @@ class TestClassifyQuestion(unittest.TestCase):
         mock_choice = Mock()
         mock_message = Mock()
 
-        mock_message.content = "0.8"  # Score above threshold (0.5)
+        mock_message.content = json.dumps({"score": 0.8})
         mock_choice.message = mock_message
         mock_response.choices = [mock_choice]
 
@@ -66,7 +153,10 @@ class TestClassifyQuestion(unittest.TestCase):
         result = self.check_question.classify_message_lm(
             "What is the capital of France?"
         )
-        self.assertTrue(result)
+        self.assertIsInstance(result, MessageClassificationResult)
+        self.assertTrue(result.result)
+        self.assertEqual(result.score, 0.8)
+        self.assertIsNone(result.reasoning)
 
     @patch("tasks.hivemind.classify_question.OpenAI")
     def test_classify_message_lm_low_score(self, mock_openai):
@@ -76,14 +166,17 @@ class TestClassifyQuestion(unittest.TestCase):
         mock_choice = Mock()
         mock_message = Mock()
 
-        mock_message.content = "0.2"  # Score below threshold (0.5)
+        mock_message.content = json.dumps({"score": 0.2})
         mock_choice.message = mock_message
         mock_response.choices = [mock_choice]
 
         mock_openai.return_value.chat.completions.create.return_value = mock_response
 
         result = self.check_question.classify_message_lm("I am going to the store.")
-        self.assertFalse(result)
+        self.assertIsInstance(result, MessageClassificationResult)
+        self.assertFalse(result.result)
+        self.assertEqual(result.score, 0.2)
+        self.assertIsNone(result.reasoning)
 
     @patch("tasks.hivemind.classify_question.OpenAI")
     def test_classify_message_lm_exact_threshold(self, mock_openai):
@@ -93,14 +186,39 @@ class TestClassifyQuestion(unittest.TestCase):
         mock_choice = Mock()
         mock_message = Mock()
 
-        mock_message.content = "0.5"  # Score equal to threshold (0.5)
+        mock_message.content = json.dumps({"score": 0.5})
         mock_choice.message = mock_message
         mock_response.choices = [mock_choice]
 
         mock_openai.return_value.chat.completions.create.return_value = mock_response
 
         result = self.check_question.classify_message_lm("Can you help me?")
-        self.assertTrue(result)
+        self.assertIsInstance(result, MessageClassificationResult)
+        self.assertTrue(result.result)
+        self.assertEqual(result.score, 0.5)
+
+    @patch("tasks.hivemind.classify_question.OpenAI")
+    def test_classify_message_lm_with_reasoning(self, mock_openai):
+        # Test classify_message_lm with reasoning enabled
+
+        mock_response = Mock()
+        mock_choice = Mock()
+        mock_message = Mock()
+
+        mock_message.content = json.dumps({
+            "score": 0.9,
+            "reasoning": "This requires up-to-date information about cryptocurrency prices which would need RAG retrieval."
+        })
+        mock_choice.message = mock_message
+        mock_response.choices = [mock_choice]
+
+        mock_openai.return_value.chat.completions.create.return_value = mock_response
+
+        result = self.check_question_with_reasoning.classify_message_lm("What is the latest Bitcoin price?")
+        self.assertIsInstance(result, MessageClassificationResult)
+        self.assertTrue(result.result)
+        self.assertEqual(result.score, 0.9)
+        self.assertEqual(result.reasoning, "This requires up-to-date information about cryptocurrency prices which would need RAG retrieval.")
 
     @patch("tasks.hivemind.classify_question.OpenAI")
     def test_classify_message_lm_boundary_values(self, mock_openai):
@@ -111,99 +229,51 @@ class TestClassifyQuestion(unittest.TestCase):
         mock_message = Mock()
 
         # Test with score 0
-        mock_message.content = "0"
+        mock_message.content = json.dumps({"score": 0.0})
         mock_choice.message = mock_message
         mock_response.choices = [mock_choice]
         mock_openai.return_value.chat.completions.create.return_value = mock_response
 
         result = self.check_question.classify_message_lm("Hello there!")
-        self.assertFalse(result)
+        self.assertIsInstance(result, MessageClassificationResult)
+        self.assertFalse(result.result)
+        self.assertEqual(result.score, 0.0)
 
         # Test with score 1
-        mock_message.content = "1"
+        mock_message.content = json.dumps({"score": 1.0})
         result = self.check_question.classify_message_lm("What is the latest news?")
-        self.assertTrue(result)
+        self.assertIsInstance(result, MessageClassificationResult)
+        self.assertTrue(result.result)
+        self.assertEqual(result.score, 1.0)
 
     @patch("tasks.hivemind.classify_question.OpenAI")
-    def test_classify_message_lm_score_below_zero(self, mock_openai):
-        # Test that classify_message_lm raises ValueError for scores below 0
+    def test_classify_message_lm_invalid_json_response(self, mock_openai):
+        # Test that classify_message_lm raises JSONDecodeError for invalid JSON
 
         mock_response = Mock()
         mock_choice = Mock()
         mock_message = Mock()
 
-        mock_message.content = "-0.1"
+        mock_message.content = "Invalid JSON"
         mock_choice.message = mock_message
         mock_response.choices = [mock_choice]
 
         mock_openai.return_value.chat.completions.create.return_value = mock_response
 
-        with self.assertRaises(ValueError) as context:
-            self.check_question.classify_message_lm("Could you help me with this?")
-        self.assertIn("Generated score must be between 0 and 1", str(context.exception))
-
-    @patch("tasks.hivemind.classify_question.OpenAI")
-    def test_classify_message_lm_invalid_response(self, mock_openai):
-        # Test that classify_message_lm raises ValueError for an invalid response from OpenAI API
-
-        mock_response = Mock()
-        mock_choice = Mock()
-        mock_message = Mock()
-
-        mock_message.content = "Invalid"  # Non-numeric response
-        mock_choice.message = mock_message
-        mock_response.choices = [mock_choice]
-
-        mock_openai.return_value.chat.completions.create.return_value = mock_response
-
-        with self.assertRaises(ValueError):
+        with self.assertRaises(json.JSONDecodeError):
             self.check_question.classify_message_lm("Can you do something for me?")
 
     @patch("tasks.hivemind.classify_question.OpenAI")
-    def test_classify_message_lm_out_of_range_response(self, mock_openai):
-        # Test that classify_message_lm raises ValueError for values outside 0-1 range
+    def test_classify_message_lm_score_validation_still_works(self, mock_openai):
+        # Test that score validation still works even with structured outputs
+        # (This tests the additional validation we keep in the code)
 
         mock_response = Mock()
         mock_choice = Mock()
         mock_message = Mock()
 
-        # Test with value greater than 1 - should raise ValueError due to score validation
-        mock_message.content = "1.5"
-        mock_choice.message = mock_message
-        mock_response.choices = [mock_choice]
-
-        mock_openai.return_value.chat.completions.create.return_value = mock_response
-
-        with self.assertRaises(ValueError) as context:
-            self.check_question.classify_message_lm("Could you help me with this?")
-        self.assertIn("Generated score must be between 0 and 1", str(context.exception))
-
-    @patch("tasks.hivemind.classify_question.OpenAI")
-    def test_classify_message_lm_invalid_decimal_format(self, mock_openai):
-        # Test that classify_message_lm raises ValueError for invalid decimal formats
-
-        mock_response = Mock()
-        mock_choice = Mock()
-        mock_message = Mock()
-
-        mock_message.content = "0.5.2"  # Invalid decimal format
-        mock_choice.message = mock_message
-        mock_response.choices = [mock_choice]
-
-        mock_openai.return_value.chat.completions.create.return_value = mock_response
-
-        with self.assertRaises(ValueError):
-            self.check_question.classify_message_lm("Could you help me with this?")
-
-    @patch("tasks.hivemind.classify_question.OpenAI")
-    def test_classify_message_lm_negative_response(self, mock_openai):
-        # Test that classify_message_lm raises ValueError for negative responses
-
-        mock_response = Mock()
-        mock_choice = Mock()
-        mock_message = Mock()
-
-        mock_message.content = "-0.5"
+        # Test with value greater than 1 - should raise ValueError due to our validation
+        mock_message.content = json.dumps({"score": 1.5})
         mock_choice.message = mock_message
         mock_response.choices = [mock_choice]
 
