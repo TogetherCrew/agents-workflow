@@ -9,6 +9,7 @@ from crewai.process import Process
 from pydantic import BaseModel
 from crewai.tools import tool
 from openai import OpenAI
+from typing import Optional
 
 
 class AgenticFlowState(BaseModel):
@@ -28,12 +29,14 @@ class AgenticHivemindFlow(Flow[AgenticFlowState]):
         community_id: str,
         enable_answer_skipping: bool = False,
         chat_history: str | None = None,
+        workflow_id: Optional[str] = None,
         persistence=None,
         max_retry_count: int = 3,
         **kwargs,
     ) -> None:
         self.enable_answer_skipping = enable_answer_skipping
         self.community_id = community_id
+        self.workflow_id = workflow_id
         self.max_retry_count = max_retry_count
         super().__init__(persistence, **kwargs)
 
@@ -100,6 +103,7 @@ class AgenticHivemindFlow(Flow[AgenticFlowState]):
         query_data_source_tool = RAGPipelineTool.setup_tools(
             community_id=self.community_id,
             enable_answer_skipping=self.enable_answer_skipping,
+            workflow_id=self.workflow_id,
         )
 
         q_a_bot_agent = Agent(
