@@ -92,6 +92,7 @@ async def run_hivemind_agent_activity(
             enable_answer_skipping=payload.enable_answer_skipping,
             chat_history=chat_history,
             workflow_id=workflow_id,
+            mongo_persistence=mongo_persistence,
         )
 
         # Update step: Flow execution start
