@@ -116,7 +116,7 @@ class MongoPersistence:
         try:
             step_entry = {
                 "stepName": step_name,
-                "timestamp": datetime.utcnow(),
+                "timestamp": datetime.now(tz=timezone.utc),
                 "data": step_data,
             }
 
@@ -125,7 +125,7 @@ class MongoPersistence:
                 "$set": {
                     "currentStep": step_name,
                     "status": status,
-                    "updatedAt": datetime.utcnow(),
+                    "updatedAt": datetime.now(tz=timezone.utc),
                 }
             }
             
