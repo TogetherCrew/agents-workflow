@@ -205,10 +205,6 @@ async def run_hivemind_agent_activity(
             )
         
         raise
-    finally:
-        # Close MongoDB connection
-        if mongo_persistence:
-            mongo_persistence.close()
 
 
 @workflow.defn
