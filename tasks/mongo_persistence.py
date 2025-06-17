@@ -198,10 +198,3 @@ class MongoPersistence:
         except Exception as e:
             logging.error(f"Error getting workflow state: {e}")
             return None
-
-    def close(self):
-        """Close the MongoDB connection."""
-        try:
-            self.client.close()
-        except Exception as e:
-            logging.error(f"Error closing MongoDB connection: {e}") 

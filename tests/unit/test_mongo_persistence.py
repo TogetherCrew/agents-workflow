@@ -156,8 +156,3 @@ class TestMongoPersistence(unittest.TestCase):
         result = self.persistence.get_workflow_state("507f1f77bcf86cd799439011")
 
         self.assertIsNone(result)
-
-    def test_close(self):
-        """Test closing the MongoDB connection"""
-        self.persistence.close()
-        self.client_mock.close.assert_called_once()
