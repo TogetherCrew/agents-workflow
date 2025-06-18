@@ -35,6 +35,7 @@ class QueryDataSources:
             community_id=self.community_id,
             query=query,
             enable_answer_skipping=self.enable_answer_skipping,
+            workflow_id=self.workflow_id,
         )
 
         # Add workflow_id to payload if available
@@ -45,7 +46,7 @@ class QueryDataSources:
         result = await client.execute_workflow(
             "HivemindWorkflow",
             payload,
-            id=f"hivemind-query-{self.community_id}-{uuid1()}",
+            id=f"hivemind-query-{self.community_id}-{self.workflow_id}",
             task_queue=hivemind_queue,
         )
 
