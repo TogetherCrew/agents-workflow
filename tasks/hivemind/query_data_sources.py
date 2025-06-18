@@ -4,7 +4,7 @@ from uuid import uuid1
 
 import nest_asyncio
 from dotenv import load_dotenv
-from typing import Type
+from typing import Type, Optional
 from tc_temporal_backend.client import TemporalClient
 from tc_temporal_backend.schema.hivemind import HivemindQueryPayload
 from pydantic import BaseModel, Field
@@ -15,9 +15,10 @@ from crewai.tools import BaseTool
 
 
 class QueryDataSources:
-    def __init__(self, community_id: str, enable_answer_skipping: bool):
+    def __init__(self, community_id: str, enable_answer_skipping: bool, workflow_id: Optional[str] = None):
         self.community_id = community_id
         self.enable_answer_skipping = enable_answer_skipping
+        self.workflow_id = workflow_id
 
     async def query(self, query: str) -> str | None:
         """
@@ -35,6 +36,10 @@ class QueryDataSources:
             query=query,
             enable_answer_skipping=self.enable_answer_skipping,
         )
+
+        # Add workflow_id to payload if available
+        if self.workflow_id:
+            payload.workflow_id = self.workflow_id
 
         hivemind_queue = self.load_hivemind_queue()
         result = await client.execute_workflow(
@@ -79,12 +84,14 @@ class RAGPipelineTool(BaseTool):
     args_schema: Type[BaseModel] = RAGPipelineToolSchema
 
     @classmethod
-    def setup_tools(cls, community_id: str, enable_answer_skipping: bool):
+    def setup_tools(cls, community_id: str, enable_answer_skipping: bool, workflow_id: Optional[str] = None):
         """
-        Setup the tool with the necessary community identifier and the flag to enable answer skipping.
+        Setup the tool with the necessary community identifier, the flag to enable answer skipping,
+        and the workflow ID for tracking.
         """
         cls.community_id = community_id
         cls.enable_answer_skipping = enable_answer_skipping
+        cls.workflow_id = workflow_id
         return cls
 
     def _run(self, query: str) -> str:
@@ -104,6 +111,7 @@ class RAGPipelineTool(BaseTool):
         query_data_sources = QueryDataSources(
             community_id=self.community_id,
             enable_answer_skipping=self.enable_answer_skipping,
+            workflow_id=self.workflow_id,
         )
         response = asyncio.run(query_data_sources.query(query))
 

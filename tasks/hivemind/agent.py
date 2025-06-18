@@ -9,6 +9,8 @@ from crewai.process import Process
 from pydantic import BaseModel
 from crewai.tools import tool
 from openai import OpenAI
+from typing import Optional
+from tasks.mongo_persistence import MongoPersistence
 
 
 class AgenticFlowState(BaseModel):
@@ -28,12 +30,16 @@ class AgenticHivemindFlow(Flow[AgenticFlowState]):
         community_id: str,
         enable_answer_skipping: bool = False,
         chat_history: str | None = None,
+        workflow_id: Optional[str] = None,
+        mongo_persistence: MongoPersistence | None = None,
         persistence=None,
         max_retry_count: int = 3,
         **kwargs,
     ) -> None:
         self.enable_answer_skipping = enable_answer_skipping
         self.community_id = community_id
+        self.workflow_id = workflow_id
+        self.mongo_persistence = mongo_persistence
         self.max_retry_count = max_retry_count
         super().__init__(persistence, **kwargs)
 
@@ -57,18 +63,57 @@ class AgenticHivemindFlow(Flow[AgenticFlowState]):
 
         # classify using a local model
         question = checker.classify_message(message=self.state.user_query)
+        # Persist the local model classification result
+        if self.mongo_persistence and self.workflow_id:
+            self.mongo_persistence.update_workflow_step(
+                workflow_id=self.workflow_id,
+                step_name="local_model_classification",
+                step_data={
+                    "result": question,
+                    "model": "local_transformer",
+                    "query": self.state.user_query,
+                }
+            )
+        
         if not question:
             self.state.state = "stop"
             return
 
         # classify using a language model
         is_question = checker.classify_question_lm(message=self.state.user_query)
+        # Persist the is_question result and reasoning
+        if self.mongo_persistence and self.workflow_id:
+            self.mongo_persistence.update_workflow_step(
+                workflow_id=self.workflow_id,
+                step_name="question_classification",
+                step_data={
+                    "result": is_question.result,
+                    "reasoning": is_question.reasoning,
+                    "model": "language_model",
+                    "query": self.state.user_query,
+                }
+            )
+        
         if not is_question.result:
             self.state.state = "stop"
             return
 
         # classify if its a RAG question
         rag_question = checker.classify_message_lm(message=self.state.user_query)
+        # Persist the rag_question result and reasoning and score
+        if self.mongo_persistence and self.workflow_id:
+            self.mongo_persistence.update_workflow_step(
+                workflow_id=self.workflow_id,
+                step_name="rag_classification",
+                step_data={
+                    "result": rag_question.result,
+                    "score": rag_question.score,
+                    "reasoning": rag_question.reasoning,
+                    "model": "language_model",
+                    "query": self.state.user_query,
+                }
+            )
+        
         self.state.state = "continue" if rag_question.result else "stop"
 
     @router(detect_question)
@@ -87,6 +132,18 @@ class AgenticHivemindFlow(Flow[AgenticFlowState]):
         is_history_query = False
         if self.state.chat_history:
             is_history_query = self.classify_query(self.state.user_query)
+            # Persist the history query classification result
+            if self.mongo_persistence and self.workflow_id:
+                self.mongo_persistence.update_workflow_step(
+                    workflow_id=self.workflow_id,
+                    step_name="history_query_classification",
+                    step_data={
+                        "result": is_history_query,
+                        "model": "openai_gpt4",
+                        "query": self.state.user_query,
+                        "hasChatHistory": True,
+                    }
+                )
 
         if is_history_query:
             logging.info("History query detected")
@@ -100,6 +157,7 @@ class AgenticHivemindFlow(Flow[AgenticFlowState]):
         query_data_source_tool = RAGPipelineTool.setup_tools(
             community_id=self.community_id,
             enable_answer_skipping=self.enable_answer_skipping,
+            workflow_id=self.workflow_id,
         )
 
         q_a_bot_agent = Agent(
