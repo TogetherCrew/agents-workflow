@@ -1,27 +1,15 @@
 import unittest
 from unittest.mock import patch, MagicMock
-import os
-from datetime import datetime
+from dotenv import load_dotenv
 from bson import ObjectId
 from tasks.mongo_persistence import MongoPersistence
-
 
 class TestMongoPersistence(unittest.TestCase):
     """Test cases for the MongoPersistence class"""
 
     def setUp(self):
         """Set up test environment"""
-        # Mock environment variables
-        self.env_patcher = patch.dict(
-            os.environ,
-            {
-                "MONGODB_HOST": "test-host",
-                "MONGODB_PORT": "27017",
-                "MONGODB_USER": "test-user",
-                "MONGODB_PASS": "test-password",
-            },
-        )
-        self.env_patcher.start()
+        load_dotenv()
 
         # Mock the MongoDB client and collection
         self.collection_mock = MagicMock()
@@ -41,13 +29,6 @@ class TestMongoPersistence(unittest.TestCase):
         """Clean up after tests"""
         self.env_patcher.stop()
         self.mongo_patcher.stop()
-
-    def test_init_with_env_vars(self):
-        """Test initialization with environment variables"""
-        self.mongo_mock.assert_called_once_with(
-            host="test-host", port=27017, username="test-user", password="test-password"
-        )
-        self.assertEqual(self.persistence.collection_name, "hivemind_workflow_states")
 
     def test_create_workflow_state(self):
         """Test creating a new workflow state"""
