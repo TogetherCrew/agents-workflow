@@ -10,11 +10,12 @@ with workflow.unsafe.imports_passed_through():
     from tasks.redis_memory import RedisMemory
     from tasks.mongo_persistence import MongoPersistence
     from tc_temporal_backend.schema.hivemind import HivemindQueryPayload
+    from tasks.schema import AgentQueryPayload
 
 
 @activity.defn
 async def run_hivemind_agent_activity(
-    payload: HivemindQueryPayload,
+    payload: AgentQueryPayload,
 ) -> str | None:
     """
     Activity that instantiates and runs the Crew.ai Flow (AgenticHivemindFlow).
