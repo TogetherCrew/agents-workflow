@@ -162,7 +162,7 @@ class MongoPersistence:
         try:
             update_data = {
                 "$set": {
-                    "response.message": response_message,
+                    "response": {"message": response_message},
                     "status": status,
                     "updatedAt": datetime.now(tz=timezone.utc),
                 }
