@@ -205,7 +205,7 @@ class AgenticHivemindFlow(Flow[AgenticFlowState]):
         rag_tool = make_rag_tool(self.enable_answer_skipping, self.community_id, self.workflow_id)
         tools = [rag_tool]
 
-        SYSTEM_INSTRUCTIONS = f"""\
+        SYSTEM_INSTRUCTIONS = """\
         You are a helpful assistant.
         """
 

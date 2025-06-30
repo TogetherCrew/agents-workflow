@@ -4,12 +4,12 @@ import os
 import nest_asyncio
 from dotenv import load_dotenv
 from typing import Optional, Callable
+from langchain.tools import tool
 from tc_temporal_backend.client import TemporalClient
 from tc_temporal_backend.schema.hivemind import HivemindQueryPayload
 
 nest_asyncio.apply()
 
-from langchain.tools import tool
 
 
 class QueryDataSources:
