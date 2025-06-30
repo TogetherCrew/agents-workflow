@@ -134,10 +134,10 @@ async def run_hivemind_agent_activity(
             }
         )
 
+        error_fallback_answer = "Looks like things didn't go through. Please give it another go."
         if isinstance(final_answer, str) and "encountered an error" in final_answer.lower():
             logging.error(f"final_answer: {final_answer}")
-            fallback_answer = "Looks like things didn't go through. Please give it another go."
-            
+
             # Update step: Error handling
             mongo_persistence.update_workflow_step(
                 workflow_id=workflow_id,
@@ -145,10 +145,10 @@ async def run_hivemind_agent_activity(
                 step_data={
                     "errorType": "crewai_error",
                     "originalAnswer": final_answer,
-                    "fallbackAnswer": fallback_answer,
+                    "fallbackAnswer": error_fallback_answer,
                 }
             )
-            final_answer = fallback_answer
+            final_answer = error_fallback_answer
 
         if memory and final_answer != "NONE":
             chat = f"User: {payload.query}\nAgent: {final_answer}"
@@ -178,7 +178,7 @@ async def run_hivemind_agent_activity(
                 status="completed_no_answer"
             )
 
-        if final_answer == "NONE":
+        if final_answer == "NONE" or final_answer == error_fallback_answer:
             return None
         else:
             return final_answer
