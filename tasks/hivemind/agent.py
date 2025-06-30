@@ -4,13 +4,15 @@ from crewai.crews.crew_output import CrewOutput
 from crewai.flow.flow import Flow, listen, start, router
 from crewai.llm import LLM
 from tasks.hivemind.classify_question import ClassifyQuestion
-from tasks.hivemind.query_data_sources import RAGPipelineTool
-from crewai.process import Process
+from tasks.hivemind.query_data_sources import make_rag_tool
 from pydantic import BaseModel
 from crewai.tools import tool
 from openai import OpenAI
 from typing import Optional
 from tasks.mongo_persistence import MongoPersistence
+from langchain_openai import ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain.agents import AgentExecutor, create_openai_functions_agent
 
 
 class AgenticFlowState(BaseModel):
@@ -154,50 +156,76 @@ class AgenticHivemindFlow(Flow[AgenticFlowState]):
 
     @router("rag")
     def do_rag_query(self) -> str:
-        query_data_source_tool = RAGPipelineTool.setup_tools(
-            community_id=self.community_id,
-            enable_answer_skipping=self.enable_answer_skipping,
-            workflow_id=self.workflow_id,
-        )
+        # query_data_source_tool = RAGPipelineTool.setup_tools(
+        #     community_id=self.community_id,
+        #     enable_answer_skipping=self.enable_answer_skipping,
+        #     workflow_id=self.workflow_id,
+        # )
 
-        q_a_bot_agent = Agent(
-            role="Q&A Bot",
-            goal=(
-                "You decide when to rely on your internal knowledge and when to retrieve real-time data. "
-                "For queries that are not specific to community data, answer using your own LLM knowledge. "
-                "Your final response must not exceed 250 words."
-            ),
-            backstory=(
-                "You are an intelligent agent capable of giving concise answers to questions."
-            ),
-            allow_delegation=True,
-            llm=LLM(model="gpt-4o-mini-2024-07-18"),
-        )
-        rag_task = Task(
-            description=(
-                "Answer the following query using a maximum of 250 words. "
-                "If the query is specific to community data, use the tool to retrieve updated information; "
-                f"otherwise, answer using your internal knowledge.\n\nQuery: {self.state.user_query}"
-            ),
-            expected_output="A clear, well-structured answer under 250 words that directly addresses the query using appropriate information sources",
-            agent=q_a_bot_agent,
-            tools=[
-                query_data_source_tool(result_as_answer=True),
-            ],
-        )
+        # q_a_bot_agent = Agent(
+        #     role="Q&A Bot",
+        #     goal=(
+        #         "You decide when to rely on your internal knowledge and when to retrieve real-time data. "
+        #         "For queries that are not specific to community data, answer using your own LLM knowledge. "
+        #         "Your final response must not exceed 250 words."
+        #     ),
+        #     backstory=(
+        #         "You are an intelligent agent capable of giving concise answers to questions."
+        #     ),
+        #     allow_delegation=True,
+        #     llm=LLM(model="gpt-4o-mini-2024-07-18"),
+        # )
+        # rag_task = Task(
+        #     description=(
+        #         "Answer the following query using a maximum of 250 words. "
+        #         "If the query is specific to community data, use the tool to retrieve updated information; "
+        #         f"otherwise, answer using your internal knowledge.\n\nQuery: {self.state.user_query}"
+        #     ),
+        #     expected_output="A clear, well-structured answer under 250 words that directly addresses the query using appropriate information sources",
+        #     agent=q_a_bot_agent,
+        #     tools=[
+        #         query_data_source_tool(result_as_answer=True),
+        #     ],
+        # )
 
-        crew = Crew(
-            agents=[q_a_bot_agent],
-            tasks=[rag_task],
-            process=Process.hierarchical,
-            manager_llm=LLM(model="gpt-4o-mini-2024-07-18"),
-            verbose=True,
-        )
+        # crew = Crew(
+        #     agents=[q_a_bot_agent],
+        #     tasks=[rag_task],
+        #     process=Process.hierarchical,
+        #     manager_llm=LLM(model="gpt-4o-mini-2024-07-18"),
+        #     verbose=True,
+        # )
 
-        crew_output = crew.kickoff()
+        # crew_output = crew.kickoff()
 
         # Store the latest crew output and increment retry count
-        self.state.last_answer = crew_output
+        # self.state.last_answer = crew_output
+        
+        llm = ChatOpenAI(model="gpt-4o-mini-2024-07-18")
+        rag_tool = make_rag_tool(self.enable_answer_skipping, self.community_id, self.workflow_id)
+        tools = [rag_tool]
+
+        SYSTEM_INSTRUCTIONS = f"""\
+        You are a helpful assistant.
+        """
+
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                ("system", SYSTEM_INSTRUCTIONS),
+                MessagesPlaceholder("chat_history", optional=True),
+                ("human", "{input}"),
+                MessagesPlaceholder("agent_scratchpad"),
+            ]
+        )
+        agent = create_openai_functions_agent(llm, tools, prompt)
+
+        # Run the agent
+        agent_executor = AgentExecutor(
+            agent=agent, tools=tools, verbose=True, return_intermediate_steps=False
+        )
+
+        result = agent_executor.invoke({"input": self.state.user_query})
+        self.state.last_answer = result["output"]
         self.state.retry_count += 1
 
         return "stop"

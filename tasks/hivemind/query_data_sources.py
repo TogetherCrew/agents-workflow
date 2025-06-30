@@ -1,17 +1,15 @@
 import asyncio
 import os
-from uuid import uuid1
 
 import nest_asyncio
 from dotenv import load_dotenv
-from typing import Type, Optional
+from typing import Optional, Callable
 from tc_temporal_backend.client import TemporalClient
 from tc_temporal_backend.schema.hivemind import HivemindQueryPayload
-from pydantic import BaseModel, Field
 
 nest_asyncio.apply()
 
-from crewai.tools import BaseTool
+from langchain.tools import tool
 
 
 class QueryDataSources:
@@ -64,55 +62,34 @@ class QueryDataSources:
         return hivemind_queue
 
 
-class RAGPipelineToolSchema(BaseModel):
-    """Input schema for RAGPipelineTool."""
+def make_rag_tool(enable_answer_skipping: bool, community_id: str, workflow_id: Optional[str] = None) -> Callable:
+    """
+    Make the RAG pipeline tool.
+    Passing the arguments to the tool instead of relying on the LLM to pass them (making the work for LLM easier)
 
-    query: str = Field(
-        ...,
-        description=(
-            "The input query string provided by the user. The name is case sensitive."
-            "Please provide a value of type string. This parameter is required."
-        ),
-    )
+    Args:
+        enable_answer_skipping (bool): The flag to enable answer skipping.
+        community_id (str): The community ID.
+        workflow_id (Optional[str]): The workflow ID.
 
-
-class RAGPipelineTool(BaseTool):
-    name: str = "RAG pipeline tool"
-    description: str = (
-        "This tool implements a Retrieval-Augmented Generation (RAG) pipeline which "
-        "queries available data sources to provide accurate answers to user queries. "
-    )
-    args_schema: Type[BaseModel] = RAGPipelineToolSchema
-
-    @classmethod
-    def setup_tools(cls, community_id: str, enable_answer_skipping: bool, workflow_id: Optional[str] = None):
+    Returns:
+        Callable: The RAG pipeline tool.
+    """
+    @tool(return_direct=True)
+    def get_rag_answer(query: str) -> str:
         """
-        Setup the tool with the necessary community identifier, the flag to enable answer skipping,
-        and the workflow ID for tracking.
-        """
-        cls.community_id = community_id
-        cls.enable_answer_skipping = enable_answer_skipping
-        cls.workflow_id = workflow_id
-        return cls
+        Get the answer from the RAG pipeline
 
-    def _run(self, query: str) -> str:
-        """
-        Execute the RAG pipeline by querying the available data sources.
+        Args:
+            query (str): The input query string provided by the user.
 
-        Parameters
-        ------------
-        query : str
-            The input query string provided by the user.
-
-        Returns
-        ----------
-        response : str
-            The response obtained after querying the data sources.
+        Returns:
+            str: The answer to the query.
         """
         query_data_sources = QueryDataSources(
-            community_id=self.community_id,
-            enable_answer_skipping=self.enable_answer_skipping,
-            workflow_id=self.workflow_id,
+            community_id=community_id,
+            enable_answer_skipping=enable_answer_skipping,
+            workflow_id=workflow_id,
         )
         response = asyncio.run(query_data_sources.query(query))
 
@@ -121,3 +98,6 @@ class RAGPipelineTool(BaseTool):
             return "NONE"
         else:
             return response
+
+    # returing the tool function
+    return get_rag_answer
