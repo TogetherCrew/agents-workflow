@@ -116,8 +116,8 @@ async def run_hivemind_agent_activity(
             }
         )
 
-        if isinstance(crew_output, CrewOutput):
-            final_answer = crew_output.raw
+        if isinstance(crew_output, str):
+            final_answer = crew_output
         elif not payload.enable_answer_skipping:
             final_answer = "No answer was generated."
         else:
