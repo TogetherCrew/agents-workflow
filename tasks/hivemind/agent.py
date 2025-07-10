@@ -161,7 +161,7 @@ class AgenticHivemindFlow(Flow[AgenticFlowState]):
         tools = [rag_tool]
 
         SYSTEM_INSTRUCTIONS = """\
-        You are a helpful assistant. Pass the incoming queries without changing it.
+        You are a helpful assistant.
         """
 
         prompt = ChatPromptTemplate.from_messages(
