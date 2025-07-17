@@ -7,6 +7,7 @@ from typing import Optional, Callable
 from langchain.tools import tool
 from tc_temporal_backend.client import TemporalClient
 from tc_temporal_backend.schema.hivemind import HivemindQueryPayload
+from temporalio.common import RetryPolicy
 
 nest_asyncio.apply()
 
@@ -46,6 +47,7 @@ class QueryDataSources:
             payload,
             id=f"hivemind-query-{self.community_id}-{self.workflow_id}",
             task_queue=hivemind_queue,
+            retry_policy=RetryPolicy(maximum_attempts=3),
         )
 
         return result
