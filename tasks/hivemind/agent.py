@@ -176,7 +176,11 @@ class AgenticHivemindFlow(Flow[AgenticFlowState]):
 
         # Run the agent
         agent_executor = AgentExecutor(
-            agent=agent, tools=tools, verbose=True, return_intermediate_steps=False
+            agent=agent,
+            tools=tools,
+            verbose=True,
+            return_intermediate_steps=False,
+            max_iterations=3,
         )
 
         result = agent_executor.invoke({"input": self.state.user_query})

@@ -1,5 +1,6 @@
 import asyncio
 import os
+import logging
 
 import nest_asyncio
 from dotenv import load_dotenv
@@ -8,6 +9,7 @@ from langchain.tools import tool
 from tc_temporal_backend.client import TemporalClient
 from tc_temporal_backend.schema.hivemind import HivemindQueryPayload
 from temporalio.common import RetryPolicy
+from temporalio.client import WorkflowFailureError
 
 nest_asyncio.apply()
 
@@ -42,13 +44,30 @@ class QueryDataSources:
             payload.workflow_id = self.workflow_id
 
         hivemind_queue = self.load_hivemind_queue()
-        result = await client.execute_workflow(
-            "HivemindWorkflow",
-            payload,
-            id=f"hivemind-query-{self.community_id}-{self.workflow_id}",
-            task_queue=hivemind_queue,
-            retry_policy=RetryPolicy(maximum_attempts=3),
-        )
+        try:
+            result = await client.execute_workflow(
+                "HivemindWorkflow",
+                payload,
+                id=f"hivemind-query-{self.community_id}-{self.workflow_id}",
+                task_queue=hivemind_queue,
+                retry_policy=RetryPolicy(maximum_attempts=3),
+            )
+        except WorkflowFailureError as e:
+            logging.error(f"WorkflowFailureError: {e} for workflow {self.workflow_id}", exc_info=True)
+            return None
+        except Exception as e:
+            logging.error(f"Exception: {e} for workflow {self.workflow_id}", exc_info=True)
+            return None
+
+        # Normalize Temporal failure-shaped responses that may be returned as data
+        if isinstance(result, dict) and (
+            "workflowExecutionFailedEventAttributes" in result or "failure" in result
+        ):
+            logging.error(f"WorkflowFailureError: {result} for workflow {self.workflow_id}", exc_info=True)
+            return None
+        if isinstance(result, str) and "workflowExecutionFailedEventAttributes" in result:
+            logging.error(f"WorkflowFailureError: {result} for workflow {self.workflow_id}", exc_info=True)
+            return None
 
         return result
 
