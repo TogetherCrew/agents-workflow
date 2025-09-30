@@ -5,7 +5,6 @@ import logging
 import nest_asyncio
 from dotenv import load_dotenv
 from typing import Optional, Callable
-from langchain.tools import tool
 from tc_temporal_backend.client import TemporalClient
 from tc_temporal_backend.schema.hivemind import HivemindQueryPayload
 from temporalio.common import RetryPolicy
@@ -96,7 +95,15 @@ def make_rag_tool(enable_answer_skipping: bool, community_id: str, workflow_id: 
     Returns:
         Callable: The RAG pipeline tool.
     """
-    @tool(return_direct=True)
+    try:
+        from langchain.tools import tool as lc_tool  # type: ignore
+    except Exception:
+        # Fallback no-op decorator if LangChain is not installed/required
+        def lc_tool(*_args, **_kwargs):
+            def decorator(func):
+                return func
+            return decorator
+    @lc_tool(return_direct=True)
     def get_rag_answer(query: str) -> str:
         """
         Get the answer from the RAG pipeline
