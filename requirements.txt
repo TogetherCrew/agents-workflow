@@ -7,5 +7,3 @@ transformers[torch]==4.49.0
 nest-asyncio==1.6.0
 openai==1.93.0
 tc-hivemind-backend==1.4.3
-langchain==0.3.26
-langchain-openai==0.3.27
